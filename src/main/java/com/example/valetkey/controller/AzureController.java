@@ -5,6 +5,7 @@ import com.example.valetkey.service.AzureSasService;
 import com.example.valetkey.service.UserService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @RestController
+@RequestMapping("/user")
 public class AzureController {
 
     @Autowired
@@ -22,42 +24,10 @@ public class AzureController {
     @Autowired
     private UserService userService;
 
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> credentials, HttpSession httpSession) {
-        String username = credentials.get("username");
-        String password = credentials.get("password");
-        Optional<User> user = userService.login(username, password);
-        if (userService.login(username, password).isPresent()) {
-            httpSession.setAttribute("user", user.get());
-            List<User> userList = userService.getAllUsers();
-            return ResponseEntity.ok(userList);
-        }
-        return ResponseEntity.badRequest().body(Map.of("message", "Invalid credentials"));
 
-    }
-
-    @PostMapping("/logout")
-    public ResponseEntity<?> logout(HttpSession session) {
-        session.invalidate();
-        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
-    }
-
-    @PostMapping("/permission")
-    public ResponseEntity<?> createUserPermission(@RequestBody Map<String, Boolean> permission, HttpSession httpSession) {
-        User user = (User) httpSession.getAttribute("user");
-        if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("message", "Not authenticated"));
-        }
-        user.setCreate(permission.get("create"));
-        user.setRead(permission.get("read"));
-        user.setWrite(permission.get("write"));
-
-        return ResponseEntity.ok(user);
-
-    }
 
     @GetMapping("/upload-sas")
-    public ResponseEntity<?> getUploadSas(@RequestParam String blobName, HttpSession session) {
+    public ResponseEntity<?> getUploadSas(@RequestParam String blobName, HttpSession session) throws Exception {
         User user = (User) session.getAttribute("user");
         if (user == null) {
             return ResponseEntity.status(401).body(Map.of("message", "Not authenticated"));
@@ -65,6 +35,10 @@ public class AzureController {
         String userBlobPath = "user-" + user.getId() + "/" + blobName;
         int expiryMinutes = 3;
         String sasUrl = azureSasService.generateBlobWriteSas(userBlobPath, expiryMinutes, user);
+        if (sasUrl == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "You do not have permission to upload"));
+        }
         return ResponseEntity.ok(Map.of(
                 "sasUrl", sasUrl,
                 "blobPath", userBlobPath,
@@ -82,6 +56,10 @@ public class AzureController {
         String userBlobPath = "user-" + user.getId() + "/" + blobName;
         int expiryMinutes = 3;
         String sasUrl = azureSasService.generateBlobReadSas(userBlobPath, expiryMinutes, user);
+        if (sasUrl == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "You do not have permission to download this blob"));
+        }
         return ResponseEntity.ok(Map.of(
                 "sasUrl", sasUrl,
                 "blobPath", userBlobPath,
@@ -89,5 +67,10 @@ public class AzureController {
         ));
     }
 
+    @GetMapping("/list-blob")
+    public ResponseEntity<?> getListBlob(@RequestParam String userId) {
+        List<String> listBlob = azureSasService.listBlobs(Long.parseLong(userId));
+        return ResponseEntity.ok(listBlob);
+    }
 
 }

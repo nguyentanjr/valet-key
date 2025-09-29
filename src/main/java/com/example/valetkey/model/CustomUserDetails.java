@@ -18,13 +18,12 @@ public class CustomUserDetails implements UserDetails {
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         if (user.getRole() != null) {
-            return List.of(
-                    new SimpleGrantedAuthority("ROLE_USER")
-            );
-        } else {
-            return List.of(new SimpleGrantedAuthority(user.getRole().name()));
+            return List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
         }
+        // nếu user chưa có role, mặc định là USER
+        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
     }
+
 
     @Override
     public String getPassword() { return user.getPassword(); }

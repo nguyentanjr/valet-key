@@ -3,6 +3,8 @@ package com.example.valetkey.service;
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
+import com.azure.storage.blob.models.BlobItem;
+import com.azure.storage.blob.models.ListBlobsOptions;
 import com.azure.storage.blob.sas.BlobSasPermission;
 import com.azure.storage.blob.sas.BlobServiceSasSignatureValues;
 import com.example.valetkey.model.User;
@@ -22,7 +24,7 @@ public class AzureSasService {
     public String generateBlobReadSas(String blobName, int expiryMinutes, User user) {
         BlobContainerClient blobContainerClient = blobServiceClient.getBlobContainerClient("valet-demo");
         BlobClient blobClient = blobContainerClient.getBlobClient(blobName);
-        BlobSasPermission blobSasPermission = new BlobSasPermission().setReadPermission(user.getRead());
+        BlobSasPermission blobSasPermission = new BlobSasPermission().setReadPermission(user.isRead());
         OffsetDateTime offsetDateTime = OffsetDateTime.now().plusMinutes(expiryMinutes);
         BlobServiceSasSignatureValues blobServiceSasSignatureValues = new BlobServiceSasSignatureValues(
                 offsetDateTime, blobSasPermission
@@ -36,8 +38,8 @@ public class AzureSasService {
         BlobContainerClient blobContainerClient = blobServiceClient.getBlobContainerClient("valet-demo");
         BlobClient blobClient = blobContainerClient.getBlobClient(blobName);
         BlobSasPermission blobSasPermission = new BlobSasPermission()
-                .setCreatePermission(user.getCreate())
-                .setWritePermission(user.getWrite());
+                .setCreatePermission(user.isCreate())
+                .setWritePermission(user.isWrite());
         OffsetDateTime offsetDateTime = OffsetDateTime.now().plusMinutes(expiryMinutes);
         BlobServiceSasSignatureValues blobServiceSasSignatureValues = new BlobServiceSasSignatureValues(
                 offsetDateTime, blobSasPermission
@@ -46,10 +48,17 @@ public class AzureSasService {
         return blobClient.getBlobUrl() + "?" + sas;
     }
 
-//    public List<String> listBlobs(Long userId) {
-//        String prefix = "user-" + userId + "/";
-//        BlobContainerClient blobContainerClient = blobServiceClient.getBlobContainerClient("valet_demo");
-//        List<String> result = new ArrayList<>();
-//        blobContainerClient.listBlobsByHierarchy()
-//    }
+    public List<String> listBlobs(Long userId) {
+        String prefix = "user-" + userId + "/";
+        BlobContainerClient blobContainerClient = blobServiceClient.getBlobContainerClient("valet-demo");
+
+        List<String> result = new ArrayList<>();
+
+        for (BlobItem blobItem : blobContainerClient.listBlobs(new ListBlobsOptions().setPrefix(prefix), null)) {
+            result.add(blobItem.getName());
+        }
+
+        return result;
+    }
+
 }

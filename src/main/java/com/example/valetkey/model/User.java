@@ -26,9 +26,9 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    private Boolean create = false;
-    private Boolean write = false;
-    private Boolean read = false;
+    private boolean create = false;
+    private boolean write = false;
+    private boolean read = false;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();

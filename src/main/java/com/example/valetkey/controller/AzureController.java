@@ -26,7 +26,7 @@ public class AzureController {
 
 
 
-    @GetMapping("/upload-sas")
+    @PostMapping("/upload-sas")
     public ResponseEntity<?> getUploadSas(@RequestParam String blobName, HttpSession session) throws Exception {
         User user = (User) session.getAttribute("user");
         if (user == null) {

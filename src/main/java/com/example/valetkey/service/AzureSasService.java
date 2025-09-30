@@ -22,29 +22,34 @@ public class AzureSasService {
     private BlobServiceClient blobServiceClient;
 
     public String generateBlobReadSas(String blobName, int expiryMinutes, User user) {
-        BlobContainerClient blobContainerClient = blobServiceClient.getBlobContainerClient("valet-demo");
-        BlobClient blobClient = blobContainerClient.getBlobClient(blobName);
-        BlobSasPermission blobSasPermission = new BlobSasPermission().setReadPermission(user.isRead());
-        OffsetDateTime offsetDateTime = OffsetDateTime.now().plusMinutes(expiryMinutes);
-        BlobServiceSasSignatureValues blobServiceSasSignatureValues = new BlobServiceSasSignatureValues(
-                offsetDateTime, blobSasPermission
-        );
-        String sas = blobClient.generateSas(blobServiceSasSignatureValues);
+        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
+        BlobClient blobClient = containerClient.getBlobClient(blobName);
+
+        if (!blobClient.exists()) {
+            throw new RuntimeException("Blob not found: " + blobName);
+        }
+
+        BlobSasPermission permission = new BlobSasPermission();
+        if (user.isRead()) permission.setReadPermission(true);
+
+        OffsetDateTime expiryTime = OffsetDateTime.now().plusMinutes(expiryMinutes);
+        BlobServiceSasSignatureValues sasValues = new BlobServiceSasSignatureValues(expiryTime, permission);
+
+        String sas = blobClient.generateSas(sasValues);
         return blobClient.getBlobUrl() + "?" + sas;
     }
 
-    //allow to overwrite and create new, add mean append not overwrite
     public String generateBlobWriteSas(String blobName, int expiryMinutes, User user) {
-        BlobContainerClient blobContainerClient = blobServiceClient.getBlobContainerClient("valet-demo");
-        BlobClient blobClient = blobContainerClient.getBlobClient(blobName);
-        BlobSasPermission blobSasPermission = new BlobSasPermission()
-                .setCreatePermission(user.isCreate())
-                .setWritePermission(user.isWrite());
-        OffsetDateTime offsetDateTime = OffsetDateTime.now().plusMinutes(expiryMinutes);
-        BlobServiceSasSignatureValues blobServiceSasSignatureValues = new BlobServiceSasSignatureValues(
-                offsetDateTime, blobSasPermission
-        );
-        String sas = blobClient.generateSas(blobServiceSasSignatureValues);
+        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
+        BlobClient blobClient = containerClient.getBlobClient(blobName);
+
+        BlobSasPermission permission = new BlobSasPermission();
+        permission.setCreatePermission(true);
+        permission.setWritePermission(user.isWrite());
+        OffsetDateTime expiryTime = OffsetDateTime.now().plusMinutes(expiryMinutes);
+        BlobServiceSasSignatureValues sasValues = new BlobServiceSasSignatureValues(expiryTime, permission);
+
+        String sas = blobClient.generateSas(sasValues);
         return blobClient.getBlobUrl() + "?" + sas;
     }
 

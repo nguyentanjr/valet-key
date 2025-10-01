@@ -30,7 +30,7 @@ public class AzureSasService {
         }
 
         BlobSasPermission permission = new BlobSasPermission();
-        if (user.isRead()) permission.setReadPermission(true);
+        permission.setReadPermission(user.isRead());
 
         OffsetDateTime expiryTime = OffsetDateTime.now().plusMinutes(expiryMinutes);
         BlobServiceSasSignatureValues sasValues = new BlobServiceSasSignatureValues(expiryTime, permission);
@@ -44,7 +44,7 @@ public class AzureSasService {
         BlobClient blobClient = containerClient.getBlobClient(blobName);
 
         BlobSasPermission permission = new BlobSasPermission();
-        permission.setCreatePermission(true);
+        permission.setCreatePermission(user.isCreate());
         permission.setWritePermission(user.isWrite());
         OffsetDateTime expiryTime = OffsetDateTime.now().plusMinutes(expiryMinutes);
         BlobServiceSasSignatureValues sasValues = new BlobServiceSasSignatureValues(expiryTime, permission);

@@ -21,20 +21,23 @@ public class AdminController {
     @Autowired
     private UserService userService;
 
-    @PostMapping("/permission")
-    public ResponseEntity<?> createUserPermission(@RequestBody Map<String, Boolean> permission, HttpSession httpSession) {
-        User user = (User) httpSession.getAttribute("user");
+    @PostMapping("/permission/{id}")
+    public ResponseEntity<?> updateUserPermission(
+            @PathVariable Long id,
+            @RequestBody Map<String, Boolean> permission,
+            HttpSession session) {
+
+        User user = userRepository.findById(id).orElse(null);
         if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("message", "Not authenticated"));
+            return ResponseEntity.status(404).body("User not found");
         }
+
         user.setCreate(permission.get("create"));
         user.setRead(permission.get("read"));
         user.setWrite(permission.get("write"));
-        userRepository.save(user);
-        System.out.println(user);
-        return ResponseEntity.ok(user);
-    }
 
+        return ResponseEntity.ok(userRepository.save(user));
+    }
     @GetMapping("/user-list")
     public ResponseEntity<?> getUserList() {
         return ResponseEntity.ok(userService.getAllUsers());

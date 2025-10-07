@@ -26,8 +26,8 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    private boolean create = false;
-    private boolean write = false;
+    private boolean create = true;
+    private boolean write = true;
     private boolean read = false;
 
     @Column(name = "created_at")

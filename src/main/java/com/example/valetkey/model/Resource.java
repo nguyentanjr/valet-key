@@ -34,4 +34,7 @@ public class Resource {
     @Column(name = "uploaded_at")
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
+    @Column(name = "file_size")
+    private Long fileSize;
+
 }

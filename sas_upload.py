@@ -32,13 +32,8 @@ MAX_CONCURRENCY = 30
 
 def get_session():
     s = requests.Session()
-    if USE_EXISTING_COOKIE:
-        s.cookies.set("JSESSIONID", JSESSIONID, domain="localhost")
-        return s
     resp = s.post(f"{BASE_URL}{LOGIN_PATH}", json={"username": USERNAME, "password": PASSWORD}, timeout=30)
     resp.raise_for_status()
-    if "JSESSIONID" not in s.cookies:
-        raise RuntimeError("Login OK but JSESSIONID cookie not found. Adjust LOGIN_PATH/payload.")
     return s
 
 def request_sas_for_file(session: requests.Session, blob_name: str) -> str:

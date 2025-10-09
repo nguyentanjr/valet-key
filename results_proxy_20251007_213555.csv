@@ -1,0 +1,11 @@
+Type,TotalTime_s,TotalBytes_MB,Throughput_MBps,File,Concurrency,ServerCPU_pct,ServerMemory_MB
+PROXY,1.11,0.01,0.01,sas_upload.py,20,4.5,2300.0
+PROXY,1.3,0.0,0.0,proxy_backend.py,20,4.5,2296.1
+PROXY,1.3,0.01,0.01,performance_comparator.py,20,4.5,2288.1
+PROXY,1.33,0.0,0.0,run_benchmark.bat,20,4.5,2300.4
+PROXY,21.74,10.93,0.5,LBP2900_R150_V330_W64_uk_EN_2.exe,20,0.2,2615.5
+PROXY,51.8,21.9,0.42,IDM v6.42 - khalinguyen.vn.rar,20,0.0,2632.5
+PROXY,80.37,61.7,0.77,Git-2.51.0-64-bit.exe,20,4.6,2667.9
+PROXY,86.46,102.14,1.18,ldiag_5.21.0_windows_x64.exe,20,7.6,2677.9
+PROXY,91.08,100.55,1.1,General_SMARTPSS-Win64_En_IS_V2.003.0000004.1.R.230310.zip,20,7.6,2678.2
+PROXY,104.15,136.1,1.31,Postman-win64-Setup.exe,20,7.5,2703.0

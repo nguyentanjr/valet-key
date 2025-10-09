@@ -1,0 +1,11 @@
+Type,TotalTime_s,TotalBytes_MB,Throughput_MBps,Filename,CPU_Proxy
+SAS,2.78,0.0,0.0,run_benchmark.bat,20
+SAS,2.8,0.01,0.01,performance_comparator.py,20
+SAS,2.88,0.0,0.0,proxy_backend.py,20
+SAS,2.91,0.01,0.0,sas_upload.py,20
+SAS,46.79,102.14,2.18,ldiag_5.21.0_windows_x64.exe,20
+SAS,46.92,10.93,0.23,LBP2900_R150_V330_W64_uk_EN_2.exe,20
+SAS,48.79,61.7,1.26,Git-2.51.0-64-bit.exe,20
+SAS,48.8,100.55,2.06,General_SMARTPSS-Win64_En_IS_V2.003.0000004.1.R.230310.zip,20
+SAS,48.82,21.9,0.45,IDM v6.42 - khalinguyen.vn.rar,20
+SAS,48.9,136.1,2.78,Postman-win64-Setup.exe,20

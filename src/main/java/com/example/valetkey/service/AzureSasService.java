@@ -5,23 +5,23 @@ import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.models.BlobItem;
 import com.azure.storage.blob.models.ListBlobsOptions;
-import com.azure.storage.blob.models.ParallelTransferOptions;
 import com.azure.storage.blob.sas.BlobSasPermission;
 import com.azure.storage.blob.sas.BlobServiceSasSignatureValues;
+import com.azure.storage.blob.models.ParallelTransferOptions;
+import com.azure.storage.blob.specialized.BlockBlobClient;
+import com.azure.storage.blob.models.BlockListType;
 import com.example.valetkey.model.Resource;
 import com.example.valetkey.model.User;
 import com.example.valetkey.repository.ResourceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 @Service
 public class AzureSasService {
@@ -35,7 +35,7 @@ public class AzureSasService {
     public String generateBlobReadSas(String blobName, int expiryMinutes, User user) {
         BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
         BlobClient blobClient = containerClient.getBlobClient(blobName);
-
+        System.out.println(user.isRead());
         if (!blobClient.exists()) {
             throw new RuntimeException("Blob not found: " + blobName);
         }
@@ -54,9 +54,13 @@ public class AzureSasService {
         BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
         BlobClient blobClient = containerClient.getBlobClient(blobName);
 
+        // Tạo SAS permission với đầy đủ quyền cho upload
         BlobSasPermission permission = new BlobSasPermission();
-        permission.setCreatePermission(true);
-        permission.setWritePermission(true);
+        permission.setCreatePermission(true);  // Cho phép tạo blob mới
+        permission.setWritePermission(true);   // Cho phép ghi
+        permission.setAddPermission(true);     // Cho phép thêm block
+        permission.setDeletePermission(false); // Không cho phép xóa
+
         OffsetDateTime expiryTime = OffsetDateTime.now().plusMinutes(expiryMinutes);
         BlobServiceSasSignatureValues sasValues = new BlobServiceSasSignatureValues(expiryTime, permission);
 
@@ -77,79 +81,77 @@ public class AzureSasService {
         return result;
     }
 
-    public String proxyUploadFileWithSpeed(MultipartFile file, String fileName, User user) throws IOException {
-        String uniqueFileName = generateUniqueFileName(fileName);
-        String blobPath = "user-" + user.getId() + "/" + uniqueFileName;
-
-        // Log bắt đầu upload
-        double fileSizeMB = file.getSize() / 1024.0 / 1024.0;
-        System.out.printf("🚀 Starting upload: %s (%.1f MB)%n", fileName, fileSizeMB);
-
+    public String uploadFile(MultipartFile file, String blobPath) throws IOException {
         BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
         BlobClient blobClient = containerClient.getBlobClient(blobPath);
 
-        final long startTime = System.currentTimeMillis();
-        final long[] lastLoggedBytes = {0};
-
-        ParallelTransferOptions transferOptions = new ParallelTransferOptions()
-                .setProgressReceiver(bytesTransferred -> {
-                    long now = System.currentTimeMillis();
-                    double uploadedMB = bytesTransferred / 1024.0 / 1024.0;
-                    double totalMB = file.getSize() / 1024.0 / 1024.0;
-                    double percentage = (double) bytesTransferred / file.getSize() * 100;
-
-                    long elapsedMs = now - startTime;
-                    double speedMBps = elapsedMs > 0 ? (bytesTransferred / 1024.0 / 1024.0) / (elapsedMs / 1000.0) : 0;
-
-                     // Log mỗi 10MB hoặc cuối cùng
-                     long tenMB = 10 * 1024 * 1024;
-                     if ((bytesTransferred - lastLoggedBytes[0] >= tenMB) || bytesTransferred == file.getSize()) {
-                         System.out.printf("📤 Upload: %.1f/%.1f MB (%.1f%%) - %.2f MB/s - %s%n",
-                                 uploadedMB, totalMB, percentage, speedMBps, fileName);
-                         lastLoggedBytes[0] = bytesTransferred;
-                     }
-                });
-
-        blobClient.uploadWithResponse(
-                file.getInputStream(),
-                file.getSize(),
-                transferOptions,
-                null, // BlobHttpHeaders
-                null, // metadata
-                null, // accessTier
-                null, // requestConditions
-                null, // timeout
-                null  // context
-        );
-        
-        System.out.printf("✅ Upload completed: %s%n", fileName);
-
-        // Lưu thông tin file vào database
-        Resource resource = new Resource();
-        resource.setFileName(uniqueFileName);
-        resource.setFilePath(blobPath);
-        resource.setUploader(user);
-        resourceRepository.save(resource);
-
-        return blobPath;
+        try (InputStream data = file.getInputStream()) {
+            blobClient.upload(data, file.getSize(), true);
+        }
+        return blobClient.getBlobUrl();
     }
 
+    public void deleteBlob(String blobPath) {
+        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
+        BlobClient blobClient = containerClient.getBlobClient(blobPath);
 
-    private String generateUniqueFileName(String originalFileName) {
-        return UUID.randomUUID().toString().substring(0, 8) + "_" + originalFileName;
-    }
-
-    public void deleteFile(String filePath) {
-        try {
-            BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
-            BlobClient blobClient = containerClient.getBlobClient(filePath);
-            
-            if (blobClient.exists()) {
-                blobClient.delete();
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to delete file from Azure Storage: " + e.getMessage(), e);
+        if (blobClient.exists()) {
+            blobClient.delete();
         }
     }
 
+    public boolean blobExists(String blobPath) {
+        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
+        BlobClient blobClient = containerClient.getBlobClient(blobPath);
+        return blobClient.exists();
+    }
+
+    /**
+     * Upload a chunk (block) for resume upload
+     */
+    public String uploadChunk(String blobPath, int chunkIndex, byte[] chunkData) throws IOException {
+        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
+        BlockBlobClient blockBlobClient = containerClient.getBlobClient(blobPath).getBlockBlobClient();
+
+        // Generate block ID (must be base64 encoded, unique for each block)
+        String blockId = java.util.Base64.getEncoder().encodeToString(
+            String.format("%08d", chunkIndex).getBytes()
+        );
+
+        // Upload block
+        blockBlobClient.stageBlock(blockId, new java.io.ByteArrayInputStream(chunkData), chunkData.length);
+
+        return blockId;
+    }
+
+    /**
+     * Commit all blocks to complete the blob
+     */
+    public void commitBlocks(String blobPath, List<String> blockIds) {
+        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
+        BlockBlobClient blockBlobClient = containerClient.getBlobClient(blobPath).getBlockBlobClient();
+
+        // Commit blocks
+        blockBlobClient.commitBlockList(blockIds);
+    }
+
+    /**
+     * Get list of uncommitted blocks (for resume)
+     */
+    public List<String> getUncommittedBlocks(String blobPath) {
+        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
+        BlockBlobClient blockBlobClient = containerClient.getBlobClient(blobPath).getBlockBlobClient();
+
+        if (!blockBlobClient.exists()) {
+            return new ArrayList<>();
+        }
+
+        // Get block list
+        var blockList = blockBlobClient.listBlocks(BlockListType.UNCOMMITTED);
+        List<String> blockIds = new ArrayList<>();
+        for (var block : blockList.getUncommittedBlocks()) {
+            blockIds.add(block.getName());
+        }
+        return blockIds;
+    }
 }

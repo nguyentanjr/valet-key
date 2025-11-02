@@ -1,0 +1,80 @@
+.public-file-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 1rem;
+}
+
+.public-file-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  padding: 3rem;
+  width: 100%;
+  max-width: 600px;
+  text-align: center;
+}
+
+.public-file-header {
+  margin-bottom: 2rem;
+}
+
+.public-file-header h1 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.public-file-header p {
+  color: #666;
+}
+
+.file-info {
+  margin: 2rem 0;
+  padding: 2rem;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.file-icon-large {
+  font-size: 4rem;
+  color: #667eea;
+  margin-bottom: 1rem;
+}
+
+.file-info h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: #333;
+  word-break: break-word;
+}
+
+.file-meta {
+  color: #666;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+}
+
+.file-date {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.btn-large {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.public-footer {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #e5e7eb;
+  color: #999;
+  font-size: 0.85rem;
+}
+

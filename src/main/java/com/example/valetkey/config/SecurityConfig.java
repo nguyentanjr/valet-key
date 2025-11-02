@@ -69,7 +69,9 @@ public class SecurityConfig {
                         .frameOptions(frame -> frame.sameOrigin())
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/admin/permission","/login","/logout","/h2-console/**","/user/list-blob/**","/user/upload-sas/**","/debug/**").permitAll()
+                        .requestMatchers("/admin/permission","/login","/logout","/h2-console/**",
+                                "/user/list-blob/**","/user/upload-sas/**","/debug/**",
+                                "/api/public/**").permitAll()
                         .anyRequest().permitAll()
                 )
                 .userDetailsService(customUserDetailsService)

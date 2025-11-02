@@ -40,8 +40,15 @@ public class FileService {
      */
     @Transactional
     public String initiateResumeUpload(String fileName, Long fileSize, User user, Long folderId) {
+        // Recalculate actual storage used from DB before checking quota
+        Long actualStorageUsed = resourceRepository.getTotalStorageUsedByUser(user);
+        user.setStorageUsed(actualStorageUsed);
+        userRepository.save(user);
+
+        // Check storage quota with accurate storageUsed
         if (!user.hasStorageSpace(fileSize)) {
-            throw new RuntimeException("Storage quota exceeded");
+            throw new RuntimeException("Storage quota exceeded. Available: " + 
+                formatBytes(user.getRemainingStorage()) + ", Required: " + formatBytes(fileSize));
         }
 
         String uploadSessionId = UUID.randomUUID().toString();
@@ -117,11 +124,12 @@ public class FileService {
         resource.setUploadProgress(resource.getFileSize());
         resource.setUploadSessionId(null);
         
-        // Update user storage
-        user.setStorageUsed(user.getStorageUsed() + resource.getFileSize());
-        userRepository.save(user);
-        
         resource = resourceRepository.save(resource);
+        
+        // Recalculate and update user storage from DB to ensure accuracy
+        Long actualStorageUsed = resourceRepository.getTotalStorageUsedByUser(user);
+        user.setStorageUsed(actualStorageUsed);
+        userRepository.save(user);
 
         log.info("Resume upload completed: {} by user: {}", resource.getFileName(), user.getUsername());
 
@@ -154,7 +162,7 @@ public class FileService {
     /**
      * Upload a file through the backend
      */
-    @Transactional
+    @Transactional(rollbackFor = {RuntimeException.class, Exception.class})
     public Resource uploadFile(MultipartFile file, User user, Long folderId, String customFileName) throws IOException {
         // Check if user has permission
         if (!user.isCreate() || !user.isWrite()) {
@@ -168,7 +176,12 @@ public class FileService {
 
         long fileSize = file.getSize();
 
-        // Check storage quota
+        // Recalculate actual storage used from DB before checking quota
+        Long actualStorageUsed = resourceRepository.getTotalStorageUsedByUser(user);
+        user.setStorageUsed(actualStorageUsed);
+        userRepository.save(user);
+
+        // Check storage quota with accurate storageUsed
         if (!user.hasStorageSpace(fileSize)) {
             throw new RuntimeException("Storage quota exceeded. Available: " + 
                 formatBytes(user.getRemainingStorage()) + ", Required: " + formatBytes(fileSize));
@@ -200,27 +213,79 @@ public class FileService {
         String uniqueFileName = generateUniqueFileName(fileName);
         String blobPath = "user-" + user.getId() + folderPath + "/" + uniqueFileName;
 
+        // Final quota check before upload - use pessimistic locking to prevent race conditions
+        // Refresh user from DB one more time to get latest storageUsed
+        user = userRepository.findById(user.getId())
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        Long finalStorageUsed = resourceRepository.getTotalStorageUsedByUser(user);
+        user.setStorageUsed(finalStorageUsed);
+        
+        // Check quota one final time before upload
+        if (!user.hasStorageSpace(fileSize)) {
+            throw new RuntimeException("Storage quota exceeded. Available: " + 
+                formatBytes(user.getRemainingStorage()) + ", Required: " + formatBytes(fileSize));
+        }
+
         // Upload to Azure
-        String azureUrl = azureSasService.uploadFile(file, blobPath);
+        String azureUrl = null;
+        Resource resource = null;
+        try {
+            azureUrl = azureSasService.uploadFile(file, blobPath);
 
-        // Create resource entity
-        Resource resource = new Resource();
-        resource.setFileName(fileName);
-        resource.setOriginalName(file.getOriginalFilename());
-        resource.setFilePath(blobPath);
-        resource.setUploader(user);
-        resource.setFolder(folder);
-        resource.setFileSize(fileSize);
-        resource.setContentType(file.getContentType());
+            // Create resource entity
+            resource = new Resource();
+            resource.setFileName(fileName);
+            resource.setOriginalName(file.getOriginalFilename());
+            resource.setFilePath(blobPath);
+            resource.setUploader(user);
+            resource.setFolder(folder);
+            resource.setFileSize(fileSize);
+            resource.setContentType(file.getContentType());
 
-        // Save to database
-        resource = resourceRepository.save(resource);
+            // Save to database
+            resource = resourceRepository.save(resource);
 
-        // Update user storage
-        user.setStorageUsed(user.getStorageUsed() + fileSize);
-        userRepository.save(user);
+            // Update user storage (use finalStorageUsed + fileSize to ensure accuracy)
+            user.setStorageUsed(finalStorageUsed + fileSize);
+            userRepository.save(user);
 
-        log.info("File uploaded successfully: {} by user: {}", fileName, user.getUsername());
+            // Only log success if everything completed without exception
+            log.info("File uploaded successfully: {} by user: {}", fileName, user.getUsername());
+
+        } catch (RuntimeException e) {
+            // If upload to Azure succeeded but something failed, clean up Azure blob
+            if (blobPath != null) {
+                try {
+                    azureSasService.deleteBlob(blobPath);
+                    log.warn("Cleaned up Azure blob {} after error: {}", blobPath, e.getMessage());
+                } catch (Exception cleanupEx) {
+                    log.error("Failed to cleanup Azure blob after error: {}", blobPath, cleanupEx);
+                }
+            }
+            // Delete resource from DB if it was created
+            if (resource != null && resource.getId() != null) {
+                try {
+                    resourceRepository.delete(resource);
+                    log.warn("Deleted resource {} from DB after error", resource.getId());
+                } catch (Exception e2) {
+                    log.error("Failed to delete resource from DB: {}", resource.getId(), e2);
+                }
+            }
+            log.error("Upload failed for file {}: {}", fileName, e.getMessage());
+            throw e; // Re-throw the exception to trigger transaction rollback
+        } catch (Exception e) {
+            // Clean up on any other exception
+            if (blobPath != null) {
+                try {
+                    azureSasService.deleteBlob(blobPath);
+                    log.warn("Cleaned up Azure blob {} after error: {}", blobPath, e.getMessage());
+                } catch (Exception cleanupEx) {
+                    log.error("Failed to cleanup Azure blob after error: {}", blobPath, cleanupEx);
+                }
+            }
+            log.error("Upload failed for file {}: {}", fileName, e.getMessage());
+            throw new RuntimeException("Failed to upload file: " + e.getMessage(), e);
+        }
 
         return resource;
     }

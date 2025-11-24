@@ -36,6 +36,19 @@ export const fileAPI = {
     });
   },
   
+  uploadBatch: (files, folderId, onProgress) => {
+    const formData = new FormData();
+    files.forEach(file => {
+      formData.append('files', file);
+    });
+    if (folderId) formData.append('folderId', folderId);
+    
+    return api.post('/api/files/upload/batch', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: onProgress,
+    });
+  },
+  
   list: (folderId, page = 0, size = 20) => {
     const params = { page, size };
     if (folderId) params.folderId = folderId;
@@ -108,6 +121,28 @@ export const fileAPI = {
 
   getUploadStatus: (sessionId) =>
     api.get(`/api/files/upload/status/${sessionId}`),
+
+  getUncommittedBlocks: (sessionId) =>
+    api.get(`/api/files/upload/uncommitted/${sessionId}`),
+
+  // Direct Azure Upload APIs
+  generateUploadSasUrl: (fileName, fileSize, folderId, expiryMinutes = 60) =>
+    api.post('/api/files/upload/sas-url', {
+      fileName,
+      fileSize,
+      folderId,
+      expiryMinutes
+    }),
+
+  confirmUpload: (blobPath, fileName, fileSize, contentType, folderId) =>
+    api.post('/api/files/upload/confirm', {
+      blobPath,
+      fileName,
+      fileSize,
+      contentType,
+      folderId
+    }),
+
 };
 
 // Folder Operations

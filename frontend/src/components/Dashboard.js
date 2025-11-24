@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaFolder, FaPlus, FaSearch } from 'react-icons/fa';
 import { fileAPI, folderAPI } from '../services/api';
 import FileUpload from './FileUpload';
@@ -23,6 +23,7 @@ function Dashboard({ user, onLogout }) {
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [selectedTargetFolder, setSelectedTargetFolder] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const fileUploadRef = useRef(null);
 
   useEffect(() => {
     loadData();
@@ -311,6 +312,7 @@ function Dashboard({ user, onLogout }) {
 
         {/* Upload */}
         <FileUpload 
+          ref={fileUploadRef}
           currentFolderId={currentFolderId} 
           onUploadSuccess={loadData}
         />
@@ -442,6 +444,7 @@ function Dashboard({ user, onLogout }) {
           </div>
         </div>
       )}
+
     </div>
   );
 }

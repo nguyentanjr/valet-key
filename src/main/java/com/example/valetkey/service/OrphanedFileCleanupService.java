@@ -27,10 +27,7 @@ public class OrphanedFileCleanupService {
     @Autowired
     private ResourceRepository resourceRepository;
 
-    /**
-     * Scheduled job to cleanup orphaned files in Azure
-     * Runs every 6 hours
-     */
+
     @Scheduled(cron = "0 0 */6 * * *") // Every 6 hours
     @Transactional
     public void cleanupOrphanedFiles() {
@@ -90,9 +87,7 @@ public class OrphanedFileCleanupService {
         }
     }
 
-    /**
-     * Manual cleanup trigger (for admin)
-     */
+
     public void manualCleanup() {
         log.info("Manual cleanup triggered");
         cleanupOrphanedFiles();

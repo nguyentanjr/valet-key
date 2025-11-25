@@ -30,9 +30,7 @@ public class FolderService {
     @Autowired
     private AzureSasService azureSasService;
 
-    /**
-     * Create a new folder
-     */
+
     @Transactional
     public Folder createFolder(String folderName, Long parentFolderId, User user) {
         // Validate folder name

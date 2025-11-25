@@ -1,9 +1,9 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useState } from 'react';
 import { FaCloudUploadAlt } from 'react-icons/fa';
 import { fileAPI } from '../services/api';
 import './FileUpload.css';
 
-const FileUpload = forwardRef(({ currentFolderId, onUploadSuccess }, ref) => {
+function FileUpload({ currentFolderId, onUploadSuccess }) {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -11,8 +11,7 @@ const FileUpload = forwardRef(({ currentFolderId, onUploadSuccess }, ref) => {
   const [fileProgress, setFileProgress] = useState({});
   const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
 
-
-  const handleFileSelect = async (e) => {
+  const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
@@ -31,26 +30,23 @@ const FileUpload = forwardRef(({ currentFolderId, onUploadSuccess }, ref) => {
       await handleBatchUpload();
     } else if (file.size > CHUNKED_THRESHOLD) {
       // Large file (> 10MB) - use direct Azure upload with chunked upload
-      await handleDirectAzureUpload(file, true); // true = use chunked upload
+      await handleDirectAzureUpload(file, true);
     } else {
       // Small file (< 10MB) - use direct Azure upload (simple)
-      await handleDirectAzureUpload(file, false); // false = simple upload
+      await handleDirectAzureUpload(file, false);
     }
   };
-
 
   /**
    * Upload directly to Azure using SAS URL
    * File only saved after 100% completion
-   * @param {File} file - File to upload
-   * @param {boolean} useChunked - Whether to use chunked upload (for files > 10MB)
    */
   const handleDirectAzureUpload = async (file, useChunked = false) => {
     setUploading(true);
     setProgress(0);
 
     try {
-      // Step 1: Request SAS URL from backend
+      // Step 1: Request SAS URL from backend (< 5ms)
       const sasResponse = await fileAPI.generateUploadSasUrl(
         file.name,
         file.size,
@@ -130,21 +126,19 @@ const FileUpload = forwardRef(({ currentFolderId, onUploadSuccess }, ref) => {
 
   /**
    * Chunked upload to Azure (for large files > 10MB)
-   * File only saved after 100% completion
    */
-  const uploadToAzureChunked = async (file, sasUrl, blobPath) => {
+  const uploadToAzureChunked = async (file, sasUrl, blobPath, onProgress = null) => {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
     const blockIds = [];
-    const baseUrl = sasUrl.split('?')[0]; // Get base URL without SAS token
-    const sasToken = sasUrl.split('?')[1]; // Get SAS token
+    const baseUrl = sasUrl.split('?')[0];
+    const sasToken = sasUrl.split('?')[1];
 
     for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
       const start = chunkIndex * CHUNK_SIZE;
       const end = Math.min(start + CHUNK_SIZE, file.size);
       const chunk = file.slice(start, end);
 
-      // Generate block ID (base64 encoded, must be valid base64)
-      // Match backend format: Base64.encodeToString(String.format("%08d", chunkIndex).getBytes())
+      // Generate block ID (base64 encoded)
       const blockId = btoa(String(chunkIndex).padStart(8, '0'));
       
       // Upload block to Azure
@@ -154,11 +148,21 @@ const FileUpload = forwardRef(({ currentFolderId, onUploadSuccess }, ref) => {
       
       // Update progress
       const chunkProgress = ((chunkIndex + 1) / totalChunks) * 100;
-      setProgress(chunkProgress);
+      if (onProgress) {
+        onProgress(chunkProgress);
+      } else {
+        setProgress(chunkProgress);
+      }
     }
 
     // Commit all blocks
     await commitBlocksToAzure(baseUrl, sasToken, blockIds);
+    
+    if (onProgress) {
+      onProgress(100);
+    } else {
+      setProgress(100);
+    }
   };
 
   /**
@@ -219,31 +223,112 @@ const FileUpload = forwardRef(({ currentFolderId, onUploadSuccess }, ref) => {
     });
   };
 
+  /**
+   * Batch upload flow:
+   * 1. Get SAS URLs from backend (< 5ms per file)
+   * 2. Upload files directly to Azure (parallel)
+   * 3. Confirm each file after upload completes
+   */
   const handleBatchUpload = async () => {
     setUploading(true);
     setProgress(0);
     setUploadResults(null);
+    setFileProgress({});
 
     try {
-      const response = await fileAPI.uploadBatch(
+      // Step 1: Generate SAS URLs for all files (fast - < 5ms per file)
+      const sasResponse = await fileAPI.generateBatchUploadSasUrls(
         selectedFiles,
         currentFolderId,
-        (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          setProgress(percentCompleted);
-        }
+        60 // 60 minutes expiry
       );
 
+      const sasUrls = sasResponse.data.sasUrls;
+      const totalFiles = selectedFiles.length;
+      const successList = [];
+      const failureList = [];
+
+      // Step 2: Upload files directly to Azure (parallel)
+      const uploadPromises = selectedFiles.map(async (file, index) => {
+        const sasInfo = sasUrls[index];
+        
+        if (sasInfo.status === 'failed') {
+          failureList.push({
+            index,
+            fileName: file.name,
+            status: 'failed',
+            error: sasInfo.error
+          });
+          return;
+        }
+
+        try {
+          const { sasUrl, blobPath } = sasInfo;
+          const CHUNKED_THRESHOLD = 10 * 1024 * 1024; // 10MB
+
+          // Upload file directly to Azure
+          if (file.size > CHUNKED_THRESHOLD) {
+            // Chunked upload for large files
+            await uploadToAzureChunked(file, sasUrl, blobPath, (progress) => {
+              setFileProgress(prev => ({
+                ...prev,
+                [index]: progress
+              }));
+            });
+          } else {
+            // Simple upload for small files
+            await uploadToAzureSimple(file, sasUrl, blobPath);
+            setFileProgress(prev => ({
+              ...prev,
+              [index]: 100
+            }));
+          }
+
+          // Step 3: Confirm upload after successful upload
+          await fileAPI.confirmUpload(
+            blobPath,
+            file.name,
+            file.size,
+            file.type,
+            currentFolderId
+          );
+
+          successList.push({
+            index,
+            fileName: file.name,
+            status: 'success'
+          });
+
+        } catch (err) {
+          failureList.push({
+            index,
+            fileName: file.name,
+            status: 'failed',
+            error: err.response?.data?.message || err.message || 'Upload failed'
+          });
+        }
+      });
+
+      // Wait for all uploads to complete
+      await Promise.all(uploadPromises);
+
+      // Update overall progress
       setProgress(100);
-      setUploadResults(response.data);
+      setUploadResults({
+        totalFiles,
+        successCount: successList.length,
+        failureCount: failureList.length,
+        successfulFiles: successList,
+        failedFiles: failureList,
+        message: `Batch upload completed: ${successList.length} succeeded, ${failureList.length} failed`
+      });
 
       setTimeout(() => {
-        if (response.data.failureCount === 0) {
+        if (failureList.length === 0) {
           // All succeeded
           setSelectedFiles([]);
           setUploadResults(null);
+          setFileProgress({});
           document.getElementById('file-input').value = '';
           onUploadSuccess();
         }
@@ -255,9 +340,9 @@ const FileUpload = forwardRef(({ currentFolderId, onUploadSuccess }, ref) => {
       alert(err.response?.data?.message || 'Batch upload failed');
       setUploading(false);
       setProgress(0);
+      setFileProgress({});
     }
   };
-
 
   return (
     <div className="file-upload-container">
@@ -294,6 +379,9 @@ const FileUpload = forwardRef(({ currentFolderId, onUploadSuccess }, ref) => {
                   {selectedFiles.map((file, idx) => (
                     <div key={idx} className="file-item">
                       • {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                      {fileProgress[idx] !== undefined && (
+                        <span className="file-progress"> - {Math.round(fileProgress[idx])}%</span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -342,9 +430,6 @@ const FileUpload = forwardRef(({ currentFolderId, onUploadSuccess }, ref) => {
       </div>
     </div>
   );
-});
-
-FileUpload.displayName = 'FileUpload';
+}
 
 export default FileUpload;
-

@@ -123,6 +123,21 @@ body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   padding: 1.5rem;
   margin-bottom: 1.5rem;
+  overflow: visible;
+}
+
+/* Hide scrollbar for card containing file list */
+.card:has(.file-list) {
+  overflow: visible;
+}
+
+.card:has(.file-list)::-webkit-scrollbar {
+  display: none;
+}
+
+.card:has(.file-list) {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
 .card-header {

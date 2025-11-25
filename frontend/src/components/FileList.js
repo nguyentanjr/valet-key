@@ -148,11 +148,8 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
               />
             </th>
             <th>Name</th>
-            <th>Type</th>
             <th>Size</th>
-            <th>Location</th>
             <th>Uploaded</th>
-            <th>Modified</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -172,7 +169,7 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
               <td>
                 <div className="file-name">
                   <FaFile className="file-icon" />
-                  <span title={file.fileName}>{file.fileName}</span>
+                  <span>{file.fileName}</span>
                   {file.isPublic && (
                     <span className="public-badge" title="This file is public">
                       🌐 Public
@@ -180,27 +177,8 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
                   )}
                 </div>
               </td>
-              <td>
-                <span className="file-type" title={file.contentType || 'Unknown'}>
-                  {file.contentType ? file.contentType.split('/')[1].toUpperCase() : 'N/A'}
-                </span>
-              </td>
               <td>{formatFileSize(file.fileSize)}</td>
-              <td>
-                <span className="file-path" title={file.filePath || 'Root'}>
-                  {file.folder?.name || 'Root'}
-                </span>
-              </td>
-              <td>
-                <span title={new Date(file.uploadedAt).toLocaleString()}>
-                  {new Date(file.uploadedAt).toLocaleDateString()}
-                </span>
-              </td>
-              <td>
-                <span title={file.updatedAt ? new Date(file.updatedAt).toLocaleString() : 'Never'}>
-                  {file.updatedAt ? new Date(file.updatedAt).toLocaleDateString() : '-'}
-                </span>
-              </td>
+              <td>{new Date(file.uploadedAt).toLocaleDateString()}</td>
               <td>
                 <div className="file-actions">
                   <button

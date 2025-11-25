@@ -78,34 +78,6 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return RateLimitService.RateLimitType.UPLOAD_SMALL;
         }
 
-        // Legacy Upload Endpoints (kept for backward compatibility, but not recommended)
-        // These endpoints upload through backend - not used in new implementation
-        if (uri.equals("/api/files/upload") && method.equals("POST")) {
-            return RateLimitService.RateLimitType.UPLOAD_SMALL;
-        }
-
-        if (uri.equals("/api/files/upload/batch") && method.equals("POST")) {
-            return RateLimitService.RateLimitType.UPLOAD_SMALL;
-        }
-
-        // Resume Upload Endpoints (for chunked uploads)
-        if (uri.equals("/api/files/upload/initiate") && method.equals("POST")) {
-            return RateLimitService.RateLimitType.UPLOAD_SMALL;
-        }
-
-        if (uri.equals("/api/files/upload/chunk") && method.equals("POST")) {
-            return RateLimitService.RateLimitType.UPLOAD_SMALL;
-        }
-
-        if (uri.equals("/api/files/upload/complete") && method.equals("POST")) {
-            return RateLimitService.RateLimitType.UPLOAD_SMALL;
-        }
-
-        // Async Upload (for very large files > 100MB)
-        if (uri.equals("/api/async-upload/initiate") && method.equals("POST")) {
-            return RateLimitService.RateLimitType.ASYNC_UPLOAD;
-        }
-
         // Bulk Operations
         if (uri.startsWith("/api/files/bulk-") && method.equals("POST")) {
             return RateLimitService.RateLimitType.BULK_OPERATION;

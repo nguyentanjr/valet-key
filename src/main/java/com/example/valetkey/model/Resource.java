@@ -68,16 +68,6 @@ public class Resource {
     @Column(name = "original_folder_id")
     private Long originalFolderId; // Store original folder before moving to trash
 
-    // Resume Upload fields
-    @Column(name = "upload_session_id")
-    private String uploadSessionId; // For resume upload
-
-    @Column(name = "upload_progress")
-    private Long uploadProgress = 0L; // Bytes uploaded so far
-
-    @Column(name = "upload_status")
-    private String uploadStatus; // PENDING, UPLOADING, COMPLETED, FAILED
-
     @PreUpdate
     private void preUpdate() {
         lastModified = LocalDateTime.now();

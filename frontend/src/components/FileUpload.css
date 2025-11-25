@@ -70,19 +70,48 @@
   margin: 0.5rem 0;
 }
 
-
-.file-list {
+/* File list trong upload area - có scrollbar */
+.selected-file .file-list {
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
   text-align: left;
   margin: 1rem 0;
   padding: 0.5rem;
   background: #f9fafb;
   border-radius: 4px;
+  /* Firefox scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: #888 #f1f1f1;
+}
+
+/* Custom scrollbar cho file list - Webkit browsers (Chrome, Safari, Edge) */
+.selected-file .file-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.selected-file .file-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.selected-file .file-list::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.selected-file .file-list::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .file-item {
   padding: 0.3rem 0;
   color: #4b5563;
   font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .upload-results {

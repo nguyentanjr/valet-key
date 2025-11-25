@@ -76,11 +76,10 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
     @Query("SELECT r FROM Resource r WHERE r.id IN :fileIds AND r.uploader = :uploader AND r.isDeleted = false")
     List<Resource> findByIdsAndUploader(List<Long> fileIds, User uploader);
     
-    // Find resource by upload session ID (for resume upload)
-    @Query("SELECT r FROM Resource r WHERE r.uploadSessionId = :sessionId AND r.isDeleted = false")
-    Optional<Resource> findByUploadSessionId(String sessionId);
-    
     // Get all file paths (for orphaned file cleanup)
     @Query("SELECT r.filePath FROM Resource r WHERE r.isDeleted = false")
     List<String> findAllFilePaths();
+    
+    // Find resource by file path (for direct upload confirmation)
+    Optional<Resource> findByFilePath(String filePath);
 }

@@ -14,7 +14,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,16 +39,12 @@ public class FileController {
     private CompressionService compressionService;
 
     /**
-     * Upload a file through backend
-     * Note: This route must be before /{fileId} to avoid route conflicts
+     * Generate SAS URL for direct Azure upload
      */
-    @PostMapping(value = "/upload", consumes = "multipart/form-data")
-    public ResponseEntity<?> uploadFile(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "folderId", required = false) Long folderId,
-            @RequestParam(value = "fileName", required = false) String fileName,
+    @PostMapping("/upload/sas-url")
+    public ResponseEntity<?> generateUploadSasUrl(
+            @RequestBody Map<String, Object> request,
             HttpSession session) {
-
         try {
             User sessionUser = (User) session.getAttribute("user");
             if (sessionUser == null) {
@@ -58,93 +53,114 @@ public class FileController {
             }
 
             User user = userRepository.getUserById(sessionUser.getId());
+            
+            String fileName = (String) request.get("fileName");
+            Long fileSize = Long.parseLong(request.get("fileSize").toString());
+            Long folderId = request.get("folderId") != null 
+                ? Long.valueOf(request.get("folderId").toString()) 
+                : null;
+            Integer expiryMinutes = request.get("expiryMinutes") != null
+                ? Integer.parseInt(request.get("expiryMinutes").toString())
+                : 60;
 
-            Resource resource = fileService.uploadFile(file, user, folderId, fileName);
+            Map<String, String> result = fileService.generateUploadSasUrl(
+                fileName, fileSize, user, folderId, expiryMinutes
+            );
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            log.error("Error generating SAS URL", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    /**
+     * Generate SAS URLs for batch upload
+     * Fast operation - only signs URLs, does not upload files
+     */
+    @PostMapping("/upload/batch/sas-urls")
+    public ResponseEntity<?> generateBatchUploadSasUrls(
+            @RequestBody Map<String, Object> request,
+            HttpSession session) {
+        try {
+            User sessionUser = (User) session.getAttribute("user");
+            if (sessionUser == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Not authenticated"));
+            }
+
+            User user = userRepository.getUserById(sessionUser.getId());
+            
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> files = (List<Map<String, Object>>) request.get("files");
+            Long folderId = request.get("folderId") != null 
+                ? Long.valueOf(request.get("folderId").toString()) 
+                : null;
+            Integer expiryMinutes = request.get("expiryMinutes") != null
+                ? Integer.parseInt(request.get("expiryMinutes").toString())
+                : 60;
+
+            if (files == null || files.isEmpty()) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("message", "No files provided"));
+            }
+
+            Map<String, Object> result = fileService.generateBatchUploadSasUrls(
+                files, user, folderId, expiryMinutes
+            );
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            log.error("Error generating batch SAS URLs", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    /**
+     * Confirm direct upload after file has been uploaded to Azure
+     * Only saves metadata to database after 100% completion
+     */
+    @PostMapping("/upload/confirm")
+    public ResponseEntity<?> confirmUpload(
+            @RequestBody Map<String, Object> request,
+            HttpSession session) {
+        try {
+            User sessionUser = (User) session.getAttribute("user");
+            if (sessionUser == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Not authenticated"));
+            }
+
+            User user = userRepository.getUserById(sessionUser.getId());
+            
+            String blobPath = (String) request.get("blobPath");
+            String fileName = (String) request.get("fileName");
+            Long fileSize = Long.parseLong(request.get("fileSize").toString());
+            String contentType = request.get("contentType") != null
+                ? (String) request.get("contentType")
+                : "application/octet-stream";
+            Long folderId = request.get("folderId") != null 
+                ? Long.valueOf(request.get("folderId").toString()) 
+                : null;
+
+            Resource resource = fileService.confirmDirectUpload(
+                blobPath, fileName, fileSize, contentType, user, folderId
+            );
 
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "File uploaded successfully");
+            response.put("message", "Upload confirmed successfully");
             response.put("file", fileToMap(resource));
 
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            log.error("Error uploading file", e);
+            log.error("Error confirming upload", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", "Failed to upload file: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * Upload multiple files at once (batch upload)
-     */
-    @PostMapping(value = "/upload/batch", consumes = "multipart/form-data")
-    public ResponseEntity<?> uploadMultipleFiles(
-            @RequestParam("files") MultipartFile[] files,
-            @RequestParam(value = "folderId", required = false) Long folderId,
-            HttpSession session) {
-
-        try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Not authenticated"));
-            }
-
-            User user = userRepository.getUserById(sessionUser.getId());
-
-            if (files == null || files.length == 0) {
-                return ResponseEntity.badRequest()
-                    .body(Map.of("message", "No files provided"));
-            }
-
-            log.info("Batch upload started: {} files by user {}", files.length, user.getUsername());
-
-            List<Map<String, Object>> successList = new ArrayList<>();
-            List<Map<String, Object>> failureList = new ArrayList<>();
-
-            for (int i = 0; i < files.length; i++) {
-                MultipartFile file = files[i];
-                try {
-                    Resource resource = fileService.uploadFile(file, user, folderId, null);
-                    
-                    Map<String, Object> fileResult = new HashMap<>();
-                    fileResult.put("index", i);
-                    fileResult.put("fileName", file.getOriginalFilename());
-                    fileResult.put("status", "success");
-                    fileResult.put("file", fileToMap(resource));
-                    successList.add(fileResult);
-                    
-                    log.debug("Batch upload: File {} uploaded successfully", file.getOriginalFilename());
-                    
-                } catch (Exception e) {
-                    Map<String, Object> fileResult = new HashMap<>();
-                    fileResult.put("index", i);
-                    fileResult.put("fileName", file.getOriginalFilename());
-                    fileResult.put("status", "failed");
-                    fileResult.put("error", e.getMessage());
-                    failureList.add(fileResult);
-                    
-                    log.error("Batch upload: File {} failed: {}", file.getOriginalFilename(), e.getMessage());
-                }
-            }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("totalFiles", files.length);
-            response.put("successCount", successList.size());
-            response.put("failureCount", failureList.size());
-            response.put("successfulFiles", successList);
-            response.put("failedFiles", failureList);
-            response.put("message", String.format("Batch upload completed: %d succeeded, %d failed", 
-                successList.size(), failureList.size()));
-
-            log.info("Batch upload completed: {} succeeded, {} failed", successList.size(), failureList.size());
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("Error in batch upload", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", "Batch upload failed: " + e.getMessage()));
+                .body(Map.of("message", e.getMessage()));
         }
     }
 
@@ -657,244 +673,6 @@ public class FileController {
         }
     }
 
-    /**
-     * Initialize resume upload
-     */
-    @PostMapping("/upload/initiate")
-    public ResponseEntity<?> initiateResumeUpload(
-            @RequestBody Map<String, Object> request,
-            HttpSession session) {
-        try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Not authenticated"));
-            }
-
-            String fileName = (String) request.get("fileName");
-            Long fileSize = Long.valueOf(request.get("fileSize").toString());
-            Long folderId = request.get("folderId") != null 
-                ? Long.valueOf(request.get("folderId").toString()) 
-                : null;
-
-            User user = userRepository.getUserById(sessionUser.getId());
-            String sessionId = fileService.initiateResumeUpload(fileName, fileSize, user, folderId);
-
-            return ResponseEntity.ok(Map.of(
-                "sessionId", sessionId,
-                "chunkSize", 5 * 1024 * 1024 // 5MB chunks
-            ));
-
-        } catch (Exception e) {
-            log.error("Error initiating upload", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", e.getMessage()));
-        }
-    }
-
-    /**
-     * Upload chunk
-     */
-    @PostMapping("/upload/chunk")
-    public ResponseEntity<?> uploadChunk(
-            @RequestParam("sessionId") String sessionId,
-            @RequestParam("chunkIndex") int chunkIndex,
-            @RequestParam("chunk") MultipartFile chunk,
-            HttpSession session) {
-        try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Not authenticated"));
-            }
-
-            User user = userRepository.getUserById(sessionUser.getId());
-            fileService.uploadChunk(sessionId, chunkIndex, chunk.getBytes(), user);
-
-            return ResponseEntity.ok(Map.of("message", "Chunk uploaded successfully"));
-
-        } catch (Exception e) {
-            log.error("Error uploading chunk", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", e.getMessage()));
-        }
-    }
-
-    /**
-     * Complete resume upload
-     */
-    @PostMapping("/upload/complete")
-    public ResponseEntity<?> completeResumeUpload(
-            @RequestBody Map<String, Object> request,
-            HttpSession session) {
-        try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Not authenticated"));
-            }
-
-            String sessionId = (String) request.get("sessionId");
-            @SuppressWarnings("unchecked")
-            List<String> blockIds = (List<String>) request.get("blockIds");
-
-            User user = userRepository.getUserById(sessionUser.getId());
-            Resource resource = fileService.completeResumeUpload(sessionId, blockIds, user);
-
-            return ResponseEntity.ok(Map.of(
-                "message", "Upload completed successfully",
-                "file", fileToMap(resource)
-            ));
-
-        } catch (Exception e) {
-            log.error("Error completing upload", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", e.getMessage()));
-        }
-    }
-
-    /**
-     * Get upload status
-     */
-    @GetMapping("/upload/status/{sessionId}")
-    public ResponseEntity<?> getUploadStatus(@PathVariable String sessionId, HttpSession session) {
-        try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Not authenticated"));
-            }
-
-            User user = userRepository.getUserById(sessionUser.getId());
-            Map<String, Object> status = fileService.getUploadStatus(sessionId, user);
-
-            return ResponseEntity.ok(status);
-
-        } catch (Exception e) {
-            log.error("Error getting upload status", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", e.getMessage()));
-        }
-    }
-
-    /**
-     * Get uncommitted blocks for resume capability
-     */
-    @GetMapping("/upload/uncommitted/{sessionId}")
-    public ResponseEntity<?> getUncommittedBlocks(@PathVariable String sessionId, HttpSession session) {
-        try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Not authenticated"));
-            }
-
-            User user = userRepository.getUserById(sessionUser.getId());
-            Map<String, Object> result = fileService.getUncommittedBlocks(sessionId, user);
-
-            return ResponseEntity.ok(result);
-
-        } catch (Exception e) {
-            log.error("Error getting uncommitted blocks", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", e.getMessage()));
-        }
-    }
-
-    /**
-     * Generate SAS URL for direct upload to Azure
-     * Frontend will use this URL to upload directly to Azure, bypassing backend
-     */
-    @PostMapping("/upload/sas-url")
-    public ResponseEntity<?> generateUploadSasUrl(
-            @RequestBody Map<String, Object> request,
-            HttpSession session) {
-        try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Not authenticated"));
-            }
-
-            String fileName = (String) request.get("fileName");
-            Long fileSize = Long.valueOf(request.get("fileSize").toString());
-            Long folderId = request.get("folderId") != null 
-                ? Long.valueOf(request.get("folderId").toString()) 
-                : null;
-            Integer expiryMinutes = request.get("expiryMinutes") != null
-                ? Integer.valueOf(request.get("expiryMinutes").toString())
-                : 60; // Default 60 minutes
-
-            User user = userRepository.getUserById(sessionUser.getId());
-            
-            // Generate blob path
-            String blobPath = fileService.generateBlobPath(fileName, user, folderId);
-            
-            // Generate SAS URL with write permission
-            String sasUrl = fileService.generateUploadSasUrl(blobPath, expiryMinutes, user);
-
-            return ResponseEntity.ok(Map.of(
-                "sasUrl", sasUrl,
-                "blobPath", blobPath,
-                "expiryMinutes", expiryMinutes,
-                "expiresAt", System.currentTimeMillis() + (expiryMinutes * 60 * 1000L)
-            ));
-
-        } catch (Exception e) {
-            log.error("Error generating upload SAS URL", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", e.getMessage()));
-        }
-    }
-
-    /**
-     * Confirm upload and save metadata to database
-     * Called by frontend after successful direct upload to Azure
-     */
-    @PostMapping("/upload/confirm")
-    public ResponseEntity<?> confirmUpload(
-            @RequestBody Map<String, Object> request,
-            HttpSession session) {
-        try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Not authenticated"));
-            }
-
-            String blobPath = (String) request.get("blobPath");
-            String fileName = (String) request.get("fileName");
-            Long fileSize = Long.valueOf(request.get("fileSize").toString());
-            String contentType = (String) request.get("contentType");
-            Long folderId = request.get("folderId") != null 
-                ? Long.valueOf(request.get("folderId").toString()) 
-                : null;
-
-            User user = userRepository.getUserById(sessionUser.getId());
-            
-            // Verify blob exists in Azure
-            if (!fileService.verifyBlobExists(blobPath)) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "File not found in Azure. Upload may have failed."));
-            }
-
-            // Save metadata to database
-            Resource resource = fileService.confirmDirectUpload(
-                blobPath, fileName, fileSize, contentType, user, folderId
-            );
-
-            return ResponseEntity.ok(Map.of(
-                "message", "Upload confirmed successfully",
-                "file", fileToMap(resource)
-            ));
-
-        } catch (Exception e) {
-            log.error("Error confirming upload", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", e.getMessage()));
-        }
-    }
-
     // Helper method
     private Map<String, Object> fileToMap(Resource resource) {
         Map<String, Object> map = new HashMap<>();
@@ -903,34 +681,14 @@ public class FileController {
         map.put("originalName", resource.getOriginalName());
         map.put("fileSize", resource.getFileSize());
         map.put("contentType", resource.getContentType());
-        map.put("filePath", resource.getFilePath());
         map.put("uploadedAt", resource.getUploadedAt());
         map.put("lastModified", resource.getLastModified());
         map.put("isPublic", resource.isPublic());
-        map.put("publicLinkToken", resource.getPublicLinkToken());
 
-        // Folder information
         if (resource.getFolder() != null) {
-            Map<String, Object> folderInfo = new HashMap<>();
-            folderInfo.put("id", resource.getFolder().getId());
-            folderInfo.put("name", resource.getFolder().getName());
-            folderInfo.put("fullPath", resource.getFolder().getFullPath());
-            map.put("folder", folderInfo);
-            
-            // Backward compatibility
             map.put("folderId", resource.getFolder().getId());
             map.put("folderName", resource.getFolder().getName());
             map.put("folderPath", resource.getFolder().getFullPath());
-        } else {
-            map.put("folder", null);
-        }
-
-        // Owner/Uploader information
-        if (resource.getUploader() != null) {
-            Map<String, Object> ownerInfo = new HashMap<>();
-            ownerInfo.put("id", resource.getUploader().getId());
-            ownerInfo.put("username", resource.getUploader().getUsername());
-            map.put("owner", ownerInfo);
         }
 
         return map;

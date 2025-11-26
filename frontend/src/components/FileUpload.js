@@ -85,7 +85,7 @@ function FileUpload({ currentFolderId, onUploadSuccess }) {
 
     } catch (err) {
       console.error('Direct Azure upload failed:', err);
-      
+
       // Check if this is a Circuit Breaker error
       if (err.isCircuitBreakerError) {
         alert(err.circuitBreakerMessage || 'The system is temporarily overloaded. Please try again later.');
@@ -93,6 +93,7 @@ function FileUpload({ currentFolderId, onUploadSuccess }) {
         alert(err.response?.data?.message || err.message || 'Upload failed');
       }
       
+
       setUploading(false);
       setProgress(0);
     }
@@ -315,11 +316,13 @@ function FileUpload({ currentFolderId, onUploadSuccess }) {
             errorMessage = err.response?.data?.message || err.message || 'Upload failed';
           }
           
+
           failureList.push({
             index,
             fileName: file.name,
             status: 'failed',
             error: errorMessage
+
           });
         }
       });
@@ -358,7 +361,7 @@ function FileUpload({ currentFolderId, onUploadSuccess }) {
       } else {
         alert(err.response?.data?.message || err.message || 'Batch upload failed');
       }
-      
+
       setUploading(false);
       setProgress(0);
       setFileProgress({});

@@ -16,6 +16,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -62,17 +64,30 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
+        
+        // Configure SecurityContextRepository to persist authentication in session
+        SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
+        
         http
                 .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.sameOrigin())
                 )
+                .securityContext(securityContext -> securityContext
+                        .securityContextRepository(securityContextRepository)
+                )
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+                        .sessionFixation().migrateSession()
+                )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/admin/permission","/login","/logout","/h2-console/**",
+                        .requestMatchers("/admin/**").hasRole("ADMIN") // Admin endpoints require ADMIN role
+                        .requestMatchers("/login","/logout","/h2-console/**",
                                 "/user/list-blob/**","/user/upload-sas/**","/debug/**",
                                 "/api/public/**").permitAll()
-                        .anyRequest().permitAll()
+                        .requestMatchers("/user", "/api/**").authenticated() // User info and API endpoints require authentication
+                        .anyRequest().authenticated() // All other endpoints require authentication
                 )
                 .userDetailsService(customUserDetailsService)
                 .logout(logout -> logout
@@ -82,7 +97,7 @@ public class SecurityConfig {
                         .invalidateHttpSession(true)
                         .deleteCookies("JSESSIONID")
                         .permitAll()
-                );;
+                );
         return http.build();
     }
 }

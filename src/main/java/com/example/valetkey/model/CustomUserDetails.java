@@ -18,7 +18,9 @@ public class CustomUserDetails implements UserDetails {
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         if (user.getRole() != null) {
-            return List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
+            // User.Role enum already has "ROLE_" prefix (ROLE_USER, ROLE_ADMIN)
+            // So we use it directly without adding another prefix
+            return List.of(new SimpleGrantedAuthority(user.getRole().name()));
         }
         // nếu user chưa có role, mặc định là USER
         return List.of(new SimpleGrantedAuthority("ROLE_USER"));

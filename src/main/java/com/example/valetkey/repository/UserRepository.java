@@ -42,4 +42,16 @@ public interface UserRepository extends JpaRepository<User, Long>   {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.id = :userId")
     Optional<User> findByIdWithLock(@Param("userId") Long userId);
+
+    /**
+     * Get total storage used across all users
+     */
+    @Query("SELECT COALESCE(SUM(u.storageUsed), 0) FROM User u")
+    Long getTotalStorageUsed();
+
+    /**
+     * Get total storage quota across all users
+     */
+    @Query("SELECT COALESCE(SUM(u.storageQuota), 0) FROM User u")
+    Long getTotalStorageQuota();
 }

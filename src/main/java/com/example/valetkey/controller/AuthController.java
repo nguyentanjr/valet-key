@@ -3,13 +3,16 @@ package com.example.valetkey.controller;
 import com.example.valetkey.model.CustomUserDetails;
 import com.example.valetkey.model.User;
 import com.example.valetkey.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -26,7 +29,8 @@ public class AuthController {
     private AuthenticationManager authenticationManager;
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> loginRequest, HttpSession session) {
+    public ResponseEntity<?> login(@RequestBody Map<String, String> loginRequest, 
+                                   HttpServletRequest request) {
         try {
             String username = loginRequest.get("username");
             String password = loginRequest.get("password");
@@ -36,7 +40,13 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(username, password)
             );
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            // Set authentication in SecurityContext
+            SecurityContext securityContext = SecurityContextHolder.getContext();
+            securityContext.setAuthentication(authentication);
+
+            // Save SecurityContext to session so it persists across requests
+            HttpSession session = request.getSession(true);
+            session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
 
             Optional<User> userOpt = userService.findByUsername(username);
             if (userOpt.isPresent()) {
@@ -59,7 +69,7 @@ public class AuthController {
                 return ResponseEntity.status(401).body(Map.of("message", "User not found"));
             }
         } catch (Exception e) {
-            return ResponseEntity.status(401).body(Map.of("message", "Invalid credentials"));
+            return ResponseEntity.status(401).body(Map.of("message", "Invalid credentials: " + e.getMessage()));
         }
     }
 

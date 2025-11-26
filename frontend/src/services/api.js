@@ -190,5 +190,23 @@ export const publicAPI = {
     axios.get(`${API_BASE_URL}/api/public/files/${token}/download`),
 };
 
+// Admin Operations
+export const adminAPI = {
+  getUsers: () =>
+    api.get('/admin/user-list'),
+
+  updatePermissions: (userId, permissions) =>
+    api.post(`/admin/permission/${userId}`, permissions),
+
+  updateQuota: (userId, payload) =>
+    api.put(`/admin/quota/${userId}`, payload),
+
+  updateAllQuota: (payload) =>
+    api.put('/admin/quota', payload),
+
+  getStats: (top = 5) =>
+    api.get('/admin/stats', { params: { top } }),
+};
+
 export default api;
 

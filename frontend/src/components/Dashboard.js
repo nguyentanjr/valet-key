@@ -3,9 +3,12 @@ import { FaFolder, FaPlus, FaSearch } from 'react-icons/fa';
 import { fileAPI, folderAPI } from '../services/api';
 import FileUpload from './FileUpload';
 import FileList from './FileList';
+import AdminPanel from './AdminPanel';
 import './Dashboard.css';
 
 function Dashboard({ user, onLogout }) {
+  // Check if user is admin
+  const isAdmin = user && user.role === 'ROLE_ADMIN';
   const [files, setFiles] = useState([]);
   const [folders, setFolders] = useState([]);
   const [currentFolderId, setCurrentFolderId] = useState(null);
@@ -193,6 +196,28 @@ function Dashboard({ user, onLogout }) {
   const deselectAll = () => {
     setSelectedFiles([]);
   };
+
+  // Show Admin Panel for admin users
+  if (isAdmin) {
+    return (
+      <div className="app">
+        <header className="header">
+          <div className="header-content">
+            <h1>☁️ Cloud Storage</h1>
+            <div className="header-user">
+              <span>{user.username} (Admin)</span>
+              <button className="btn btn-secondary btn-small" onClick={onLogout}>
+                Logout
+              </button>
+            </div>
+          </div>
+        </header>
+        <div className="container">
+          <AdminPanel />
+        </div>
+      </div>
+    );
+  }
 
   if (loading && !files.length) {
     return <div className="loading">Loading...</div>;

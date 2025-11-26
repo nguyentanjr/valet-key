@@ -21,6 +21,11 @@ public class AdminController {
     @Autowired
     private UserService userService;
 
+    @GetMapping("/user-list")
+    public ResponseEntity<?> getUserList() {
+        return ResponseEntity.ok(userService.getAllUsers());
+    }
+
     @PostMapping("/permission/{id}")
     public ResponseEntity<?> updateUserPermission(
             @PathVariable Long id,
@@ -38,8 +43,47 @@ public class AdminController {
 
         return ResponseEntity.ok(userRepository.save(user));
     }
-    @GetMapping("/user-list")
-    public ResponseEntity<?> getUserList() {
-        return ResponseEntity.ok(userService.getAllUsers());
+
+    @PutMapping("/quota/{id}")
+    public ResponseEntity<?> updateUserQuota(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> payload) {
+        try {
+            Double quotaGb = ((Number) payload.get("storageQuotaGb")).doubleValue();
+            Long quotaBytes = (long) (quotaGb * 1024 * 1024 * 1024);
+            
+            User updatedUser = userService.updateStorageQuota(id, quotaBytes);
+            return ResponseEntity.ok(updatedUser);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/quota")
+    public ResponseEntity<?> updateAllUserQuotas(
+            @RequestBody Map<String, Object> payload) {
+        try {
+            Double quotaGb = ((Number) payload.get("storageQuotaGb")).doubleValue();
+            Long quotaBytes = (long) (quotaGb * 1024 * 1024 * 1024);
+            
+            int updatedCount = userService.updateAllUserQuotas(quotaBytes);
+            return ResponseEntity.ok(Map.of(
+                "message", "Updated quota for " + updatedCount + " users",
+                "updatedCount", updatedCount,
+                "newQuotaBytes", quotaBytes
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<?> getSystemStats(
+            @RequestParam(defaultValue = "5") int top) {
+        try {
+            return ResponseEntity.ok(userService.getSystemStats(top));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
     }
 }

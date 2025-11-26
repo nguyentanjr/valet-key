@@ -4,16 +4,16 @@ import com.example.valetkey.model.User;
 import com.example.valetkey.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
 
     @Autowired
     private UserRepository userRepository;
-
 
     public void createDemoUsers() {
         if (userRepository.findUserByUsername("demo").isEmpty()) {
@@ -57,4 +57,88 @@ public class UserService {
         return userRepository.findUserByUsername(username);
     }
 
+    /**
+     * Update storage quota for a single user
+     */
+    @Transactional
+    public User updateStorageQuota(Long userId, Long newQuotaBytes) {
+        if (newQuotaBytes == null || newQuotaBytes <= 0) {
+            throw new RuntimeException("Storage quota must be greater than 0");
+        }
+        
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        if (user.getStorageUsed() != null && user.getStorageUsed() > newQuotaBytes) {
+            throw new RuntimeException("New quota is smaller than current storage usage");
+        }
+        
+        user.setStorageQuota(newQuotaBytes);
+        return userRepository.save(user);
+    }
+
+    /**
+     * Update storage quota for all users
+     */
+    @Transactional
+    public int updateAllUserQuotas(Long newQuotaBytes) {
+        if (newQuotaBytes == null || newQuotaBytes <= 0) {
+            throw new RuntimeException("Storage quota must be greater than 0");
+        }
+        
+        List<User> users = userRepository.findAll();
+        
+        // Check if any user has storage used greater than new quota
+        for (User user : users) {
+            if (user.getStorageUsed() != null && user.getStorageUsed() > newQuotaBytes) {
+                throw new RuntimeException("Cannot set quota smaller than current usage for user " + user.getUsername());
+            }
+        }
+        
+        // Update all users
+        users.forEach(user -> user.setStorageQuota(newQuotaBytes));
+        userRepository.saveAll(users);
+        
+        return users.size();
+    }
+
+    /**
+     * Get system statistics
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getSystemStats(int topN) {
+        Map<String, Object> stats = new HashMap<>();
+        
+        long totalUsers = userRepository.count();
+        Long totalStorageUsed = userRepository.getTotalStorageUsed();
+        Long totalStorageQuota = userRepository.getTotalStorageQuota();
+        
+        stats.put("totalUsers", totalUsers);
+        stats.put("totalStorageUsed", totalStorageUsed != null ? totalStorageUsed : 0L);
+        stats.put("totalStorageQuota", totalStorageQuota != null ? totalStorageQuota : 0L);
+        stats.put("usagePercentage", totalStorageQuota != null && totalStorageQuota > 0
+            ? (double) totalStorageUsed * 100 / totalStorageQuota
+            : 0.0);
+        
+        // Top consumers by storage usage
+        List<Map<String, Object>> topConsumers = userRepository.findAll().stream()
+            .sorted(Comparator.comparing(User::getStorageUsed, Comparator.nullsLast(Comparator.reverseOrder())))
+            .limit(topN)
+            .map(user -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", user.getId());
+                map.put("username", user.getUsername());
+                map.put("storageUsed", user.getStorageUsed() != null ? user.getStorageUsed() : 0L);
+                map.put("storageQuota", user.getStorageQuota() != null ? user.getStorageQuota() : 0L);
+                map.put("usagePercentage", user.getStorageQuota() != null && user.getStorageQuota() > 0
+                    ? (double) (user.getStorageUsed() != null ? user.getStorageUsed() : 0L) * 100 / user.getStorageQuota()
+                    : 0.0);
+                return map;
+            })
+            .collect(Collectors.toList());
+        
+        stats.put("topConsumers", topConsumers);
+        
+        return stats;
+    }
 }

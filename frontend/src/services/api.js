@@ -11,6 +11,27 @@ const api = axios.create({
   },
 });
 
+// Response interceptor to handle Circuit Breaker errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Check if this is a Circuit Breaker error
+    if (error.response) {
+      const { status, data } = error.response;
+      
+      // 503 Service Unavailable or circuitBreakerOpen flag
+      if (status === 503 || (data && data.circuitBreakerOpen)) {
+        // Add circuit breaker flag to error for easy detection
+        error.isCircuitBreakerError = true;
+        error.circuitBreakerMessage = data?.message || 'The system is temporarily overloaded. Please try again later.';
+        error.retryAfter = data?.retryAfter || 60;
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
 // Authentication
 export const authAPI = {
   login: (username, password) => 
@@ -25,14 +46,36 @@ export const authAPI = {
 
 // File Operations
 export const fileAPI = {
-  upload: (file, folderId, fileName) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (folderId) formData.append('folderId', folderId);
-    if (fileName) formData.append('fileName', fileName);
+  // Direct Azure Upload APIs
+  generateUploadSasUrl: (fileName, fileSize, folderId, expiryMinutes = 60) =>
+    api.post('/api/files/upload/sas-url', {
+      fileName,
+      fileSize,
+      folderId,
+      expiryMinutes
+    }),
+
+  confirmUpload: (blobPath, fileName, fileSize, contentType, folderId) =>
+    api.post('/api/files/upload/confirm', {
+      blobPath,
+      fileName,
+      fileSize,
+      contentType,
+      folderId
+    }),
+
+  // Generate SAS URLs for batch upload
+  generateBatchUploadSasUrls: (files, folderId, expiryMinutes = 60) => {
+    const fileInfos = files.map(file => ({
+      fileName: file.name,
+      fileSize: file.size,
+      contentType: file.type
+    }));
     
-    return api.post('/api/files/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+    return api.post('/api/files/upload/batch/sas-urls', {
+      files: fileInfos,
+      folderId,
+      expiryMinutes
     });
   },
   
@@ -89,25 +132,6 @@ export const fileAPI = {
       responseType: 'blob',
     }),
 
-  // Resume upload
-  initiateUpload: (fileName, fileSize, folderId) =>
-    api.post('/api/files/upload/initiate', { fileName, fileSize, folderId }),
-
-  uploadChunk: (sessionId, chunkIndex, chunk) => {
-    const formData = new FormData();
-    formData.append('sessionId', sessionId);
-    formData.append('chunkIndex', chunkIndex);
-    formData.append('chunk', chunk);
-    return api.post('/api/files/upload/chunk', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-
-  completeUpload: (sessionId, blockIds) =>
-    api.post('/api/files/upload/complete', { sessionId, blockIds }),
-
-  getUploadStatus: (sessionId) =>
-    api.get(`/api/files/upload/status/${sessionId}`),
 };
 
 // Folder Operations

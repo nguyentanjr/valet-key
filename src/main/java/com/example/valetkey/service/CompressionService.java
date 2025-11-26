@@ -27,9 +27,6 @@ public class CompressionService {
     @Autowired
     private AzureSasService azureSasService;
 
-    /**
-     * Create a ZIP file containing multiple files
-     */
     public byte[] createZipFile(List<Resource> files, User user) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         
@@ -80,9 +77,7 @@ public class CompressionService {
         return zipBytes;
     }
 
-    /**
-     * Get ZIP file name for download
-     */
+
     public String getZipFileName(List<Resource> files) {
         if (files.size() == 1) {
             String fileName = files.get(0).getFileName();

@@ -25,7 +25,12 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
       const response = await fileAPI.getDownloadUrl(fileId);
       window.open(response.data.downloadUrl, '_blank');
     } catch (err) {
-      alert('Failed to generate download URL');
+      // Check if this is a Circuit Breaker error
+      if (err.isCircuitBreakerError) {
+        alert(err.circuitBreakerMessage || 'The system is temporarily overloaded. Please try again later.');
+      } else {
+        alert(err.response?.data?.message || err.message || 'Failed to generate download URL. Please try again.');
+      }
     }
   };
 
@@ -37,7 +42,12 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
       await fileAPI.delete(fileId);
       onFileDeleted(fileId);
     } catch (err) {
-      alert('Failed to delete file');
+      // Check if this is a Circuit Breaker error
+      if (err.isCircuitBreakerError) {
+        alert(err.circuitBreakerMessage || 'The system is temporarily overloaded. Please try again later.');
+      } else {
+        alert(err.response?.data?.message || err.message || 'Failed to delete file. Please try again.');
+      }
     } finally {
       setDeletingFiles(prev => {
         const next = new Set(prev);
@@ -55,7 +65,12 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
       await fileAPI.permanentDelete(fileId);
       onFileDeleted(fileId);
     } catch (err) {
-      alert('Failed to permanently delete file');
+      // Check if this is a Circuit Breaker error
+      if (err.isCircuitBreakerError) {
+        alert(err.circuitBreakerMessage || 'The system is temporarily overloaded. Please try again later.');
+      } else {
+        alert(err.response?.data?.message || err.message || 'Failed to permanently delete file. Please try again.');
+      }
     } finally {
       setDeletingFiles(prev => {
         const next = new Set(prev);
@@ -73,7 +88,12 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
       setPublicLink(link);
       setShareModal(fileId);
     } catch (err) {
-      alert('Failed to generate public link');
+      // Check if this is a Circuit Breaker error
+      if (err.isCircuitBreakerError) {
+        alert(err.circuitBreakerMessage || 'The system is temporarily overloaded. Please try again later.');
+      } else {
+        alert(err.response?.data?.message || err.message || 'Failed to generate public link. Please try again.');
+      }
     }
   };
 
@@ -84,7 +104,12 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
       await fileAPI.revokePublicLink(fileId);
       onFileUpdated();
     } catch (err) {
-      alert('Failed to revoke public link');
+      // Check if this is a Circuit Breaker error
+      if (err.isCircuitBreakerError) {
+        alert(err.circuitBreakerMessage || 'The system is temporarily overloaded. Please try again later.');
+      } else {
+        alert(err.response?.data?.message || err.message || 'Failed to revoke public link. Please try again.');
+      }
     }
   };
 
@@ -97,7 +122,12 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
       setNewName('');
       onFileUpdated();
     } catch (err) {
-      alert('Failed to rename file');
+      // Check if this is a Circuit Breaker error
+      if (err.isCircuitBreakerError) {
+        alert(err.circuitBreakerMessage || 'The system is temporarily overloaded. Please try again later.');
+      } else {
+        alert(err.response?.data?.message || err.message || 'Failed to rename file. Please try again.');
+      }
     }
   };
 
@@ -108,7 +138,12 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
       setTargetFolderId('');
       onFileUpdated();
     } catch (err) {
-      alert('Failed to move file');
+      // Check if this is a Circuit Breaker error
+      if (err.isCircuitBreakerError) {
+        alert(err.circuitBreakerMessage || 'The system is temporarily overloaded. Please try again later.');
+      } else {
+        alert(err.response?.data?.message || err.message || 'Failed to move file. Please try again.');
+      }
     }
   };
 

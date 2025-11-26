@@ -7,22 +7,21 @@ import com.azure.storage.blob.models.BlobItem;
 import com.azure.storage.blob.models.ListBlobsOptions;
 import com.azure.storage.blob.sas.BlobSasPermission;
 import com.azure.storage.blob.sas.BlobServiceSasSignatureValues;
-import com.azure.storage.blob.models.ParallelTransferOptions;
-import com.azure.storage.blob.specialized.BlockBlobClient;
-import com.azure.storage.blob.models.BlockListType;
 import com.example.valetkey.model.Resource;
 import com.example.valetkey.model.User;
 import com.example.valetkey.repository.ResourceRepository;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 public class AzureSasService {
 
@@ -32,10 +31,16 @@ public class AzureSasService {
     @Autowired
     private ResourceRepository resourceRepository;
 
-    public String generateBlobReadSas(String blobName, int expiryMinutes, User user) {
+    @CircuitBreaker(name = "azureService", fallbackMethod = "generateBlobReadSasFallback")
+    @Retry(name = "azureService")
+    @Cacheable(value = "sasUrls", key = "#blobName + '_' + #user.id")
+    public String generateBlobReadSas(String blobName, int expiryMinutes, User user) throws InterruptedException {
+        log.warn(">>> Retry calling Azure now...");
+        log.debug("Generating SAS URL for blob: {}", blobName);
+
         BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
         BlobClient blobClient = containerClient.getBlobClient(blobName);
-        System.out.println(user.isRead());
+
         if (!blobClient.exists()) {
             throw new RuntimeException("Blob not found: " + blobName);
         }
@@ -47,7 +52,16 @@ public class AzureSasService {
         BlobServiceSasSignatureValues sasValues = new BlobServiceSasSignatureValues(expiryTime, permission);
 
         String sas = blobClient.generateSas(sasValues);
-        return blobClient.getBlobUrl() + "?" + sas;
+        String sasUrl = blobClient.getBlobUrl() + "?" + sas;
+        
+        log.debug("Generated SAS URL successfully for blob: {}", blobName);
+        return sasUrl;
+    }
+    
+    // Fallback method for circuit breaker
+    public String generateBlobReadSasFallback(String blobName, int expiryMinutes, User user, Exception ex) {
+        log.error("Circuit breaker fallback: Failed to generate SAS for blob: {}, Error: {}", blobName, ex.getMessage());
+        throw new RuntimeException("Azure Storage is temporarily unavailable. Please try again later.");
     }
 
     public String generateBlobWriteSas(String blobName, int expiryMinutes, User user) {
@@ -81,16 +95,7 @@ public class AzureSasService {
         return result;
     }
 
-    public String uploadFile(MultipartFile file, String blobPath) throws IOException {
-        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
-        BlobClient blobClient = containerClient.getBlobClient(blobPath);
-
-        try (InputStream data = file.getInputStream()) {
-            blobClient.upload(data, file.getSize(), true);
-        }
-        return blobClient.getBlobUrl();
-    }
-
+    @CircuitBreaker(name = "azureService", fallbackMethod = "deleteBlobFallback")
     public void deleteBlob(String blobPath) {
         BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
         BlobClient blobClient = containerClient.getBlobClient(blobPath);
@@ -100,58 +105,17 @@ public class AzureSasService {
         }
     }
 
+    private void deleteBlobFallback(String blobName, Exception e) {
+        log.error("Circuit breaker OPEN for deleteBlob. Azure is unavailable. Error: {}",
+                e.getMessage());
+        throw new RuntimeException(
+                "Delete operation temporarily unavailable. File will be removed later.", e);
+    }
+
     public boolean blobExists(String blobPath) {
         BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
         BlobClient blobClient = containerClient.getBlobClient(blobPath);
         return blobClient.exists();
     }
 
-    /**
-     * Upload a chunk (block) for resume upload
-     */
-    public String uploadChunk(String blobPath, int chunkIndex, byte[] chunkData) throws IOException {
-        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
-        BlockBlobClient blockBlobClient = containerClient.getBlobClient(blobPath).getBlockBlobClient();
-
-        // Generate block ID (must be base64 encoded, unique for each block)
-        String blockId = java.util.Base64.getEncoder().encodeToString(
-            String.format("%08d", chunkIndex).getBytes()
-        );
-
-        // Upload block
-        blockBlobClient.stageBlock(blockId, new java.io.ByteArrayInputStream(chunkData), chunkData.length);
-
-        return blockId;
-    }
-
-    /**
-     * Commit all blocks to complete the blob
-     */
-    public void commitBlocks(String blobPath, List<String> blockIds) {
-        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
-        BlockBlobClient blockBlobClient = containerClient.getBlobClient(blobPath).getBlockBlobClient();
-
-        // Commit blocks
-        blockBlobClient.commitBlockList(blockIds);
-    }
-
-    /**
-     * Get list of uncommitted blocks (for resume)
-     */
-    public List<String> getUncommittedBlocks(String blobPath) {
-        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
-        BlockBlobClient blockBlobClient = containerClient.getBlobClient(blobPath).getBlockBlobClient();
-
-        if (!blockBlobClient.exists()) {
-            return new ArrayList<>();
-        }
-
-        // Get block list
-        var blockList = blockBlobClient.listBlocks(BlockListType.UNCOMMITTED);
-        List<String> blockIds = new ArrayList<>();
-        for (var block : blockList.getUncommittedBlocks()) {
-            blockIds.add(block.getName());
-        }
-        return blockIds;
-    }
 }

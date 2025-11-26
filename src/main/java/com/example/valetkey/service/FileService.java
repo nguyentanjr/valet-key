@@ -8,14 +8,14 @@ import com.example.valetkey.repository.ResourceRepository;
 import com.example.valetkey.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -35,260 +35,7 @@ public class FileService {
     @Autowired
     private AzureSasService azureSasService;
 
-    /**
-     * Initialize resume upload session
-     */
-    @Transactional
-    public String initiateResumeUpload(String fileName, Long fileSize, User user, Long folderId) {
-        // Recalculate actual storage used from DB before checking quota
-        Long actualStorageUsed = resourceRepository.getTotalStorageUsedByUser(user);
-        user.setStorageUsed(actualStorageUsed);
-        userRepository.save(user);
 
-        // Check storage quota with accurate storageUsed
-        if (!user.hasStorageSpace(fileSize)) {
-            throw new RuntimeException("Storage quota exceeded. Available: " + 
-                formatBytes(user.getRemainingStorage()) + ", Required: " + formatBytes(fileSize));
-        }
-
-        String uploadSessionId = UUID.randomUUID().toString();
-        String uniqueFileName = generateUniqueFileName(fileName);
-        
-        String folderPath = "";
-        Folder folder = null;
-        if (folderId != null) {
-            folder = folderRepository.findById(folderId)
-                .orElseThrow(() -> new RuntimeException("Folder not found"));
-            folderPath = folder.getFullPath();
-        }
-
-        String blobPath = "user-" + user.getId() + folderPath + "/" + uniqueFileName;
-
-        // Create resource with upload session
-        Resource resource = new Resource();
-        resource.setFileName(fileName);
-        resource.setFilePath(blobPath);
-        resource.setUploader(user);
-        resource.setFolder(folder);
-        resource.setFileSize(fileSize);
-        resource.setUploadSessionId(uploadSessionId);
-        resource.setUploadStatus("PENDING");
-        resource.setUploadProgress(0L);
-
-        resourceRepository.save(resource);
-
-        return uploadSessionId;
-    }
-
-    /**
-     * Upload file chunk for resume upload
-     */
-    @Transactional
-    public void uploadChunk(String sessionId, int chunkIndex, byte[] chunkData, User user) throws IOException {
-        Resource resource = resourceRepository.findByUploadSessionId(sessionId)
-            .orElseThrow(() -> new RuntimeException("Upload session not found"));
-
-        if (!resource.getUploader().getId().equals(user.getId())) {
-            throw new RuntimeException("Access denied");
-        }
-
-        // Upload chunk to Azure (using block blob)
-        azureSasService.uploadChunk(resource.getFilePath(), chunkIndex, chunkData);
-
-        // Update progress
-        resource.setUploadProgress(resource.getUploadProgress() + chunkData.length);
-        resource.setUploadStatus("UPLOADING");
-        resourceRepository.save(resource);
-
-        log.debug("Uploaded chunk {} for session {}, progress: {} / {}", 
-            chunkIndex, sessionId, resource.getUploadProgress(), resource.getFileSize());
-    }
-
-    /**
-     * Complete resume upload (commit blocks)
-     */
-    @Transactional
-    public Resource completeResumeUpload(String sessionId, List<String> blockIds, User user) throws IOException {
-        Resource resource = resourceRepository.findByUploadSessionId(sessionId)
-            .orElseThrow(() -> new RuntimeException("Upload session not found"));
-
-        if (!resource.getUploader().getId().equals(user.getId())) {
-            throw new RuntimeException("Access denied");
-        }
-
-        // Commit blocks in Azure
-        azureSasService.commitBlocks(resource.getFilePath(), blockIds);
-
-        // Mark as completed
-        resource.setUploadStatus("COMPLETED");
-        resource.setUploadProgress(resource.getFileSize());
-        resource.setUploadSessionId(null);
-        
-        resource = resourceRepository.save(resource);
-        
-        // Recalculate and update user storage from DB to ensure accuracy
-        Long actualStorageUsed = resourceRepository.getTotalStorageUsedByUser(user);
-        user.setStorageUsed(actualStorageUsed);
-        userRepository.save(user);
-
-        log.info("Resume upload completed: {} by user: {}", resource.getFileName(), user.getUsername());
-
-        return resource;
-    }
-
-    /**
-     * Get upload status
-     */
-    @Transactional(readOnly = true)
-    public Map<String, Object> getUploadStatus(String sessionId, User user) {
-        Resource resource = resourceRepository.findByUploadSessionId(sessionId)
-            .orElseThrow(() -> new RuntimeException("Upload session not found"));
-
-        if (!resource.getUploader().getId().equals(user.getId())) {
-            throw new RuntimeException("Access denied");
-        }
-
-        Map<String, Object> status = new HashMap<>();
-        status.put("sessionId", sessionId);
-        status.put("status", resource.getUploadStatus());
-        status.put("progress", resource.getUploadProgress());
-        status.put("totalSize", resource.getFileSize());
-        status.put("percentage", resource.getFileSize() > 0 
-            ? (resource.getUploadProgress() * 100.0 / resource.getFileSize()) : 0);
-
-        return status;
-    }
-
-    /**
-     * Upload a file through the backend
-     */
-    @Transactional(rollbackFor = {RuntimeException.class, Exception.class})
-    public Resource uploadFile(MultipartFile file, User user, Long folderId, String customFileName) throws IOException {
-        // Check if user has permission
-        if (!user.isCreate() || !user.isWrite()) {
-            throw new RuntimeException("User does not have permission to upload files");
-        }
-
-        // Validate file
-        if (file.isEmpty()) {
-            throw new RuntimeException("Cannot upload empty file");
-        }
-
-        long fileSize = file.getSize();
-
-        // Recalculate actual storage used from DB before checking quota
-        Long actualStorageUsed = resourceRepository.getTotalStorageUsedByUser(user);
-        user.setStorageUsed(actualStorageUsed);
-        userRepository.save(user);
-
-        // Check storage quota with accurate storageUsed
-        if (!user.hasStorageSpace(fileSize)) {
-            throw new RuntimeException("Storage quota exceeded. Available: " + 
-                formatBytes(user.getRemainingStorage()) + ", Required: " + formatBytes(fileSize));
-        }
-
-        // Determine file name
-        String fileName = (customFileName != null && !customFileName.trim().isEmpty()) 
-            ? customFileName.trim() 
-            : file.getOriginalFilename();
-
-        if (fileName == null || fileName.isEmpty()) {
-            fileName = "unnamed_" + System.currentTimeMillis();
-        }
-
-        // Get folder if specified
-        Folder folder = null;
-        if (folderId != null) {
-            folder = folderRepository.findById(folderId)
-                .orElseThrow(() -> new RuntimeException("Folder not found"));
-            
-            // Verify folder belongs to user
-            if (!folder.getOwner().getId().equals(user.getId())) {
-                throw new RuntimeException("Access denied to this folder");
-            }
-        }
-
-        // Create unique blob path
-        String folderPath = (folder != null) ? folder.getFullPath() : "";
-        String uniqueFileName = generateUniqueFileName(fileName);
-        String blobPath = "user-" + user.getId() + folderPath + "/" + uniqueFileName;
-
-        // Final quota check before upload - use pessimistic locking to prevent race conditions
-        // Refresh user from DB one more time to get latest storageUsed
-        user = userRepository.findById(user.getId())
-            .orElseThrow(() -> new RuntimeException("User not found"));
-        Long finalStorageUsed = resourceRepository.getTotalStorageUsedByUser(user);
-        user.setStorageUsed(finalStorageUsed);
-        
-        // Check quota one final time before upload
-        if (!user.hasStorageSpace(fileSize)) {
-            throw new RuntimeException("Storage quota exceeded. Available: " + 
-                formatBytes(user.getRemainingStorage()) + ", Required: " + formatBytes(fileSize));
-        }
-
-        // Upload to Azure
-        String azureUrl = null;
-        Resource resource = null;
-        try {
-            azureUrl = azureSasService.uploadFile(file, blobPath);
-
-            // Create resource entity
-            resource = new Resource();
-            resource.setFileName(fileName);
-            resource.setOriginalName(file.getOriginalFilename());
-            resource.setFilePath(blobPath);
-            resource.setUploader(user);
-            resource.setFolder(folder);
-            resource.setFileSize(fileSize);
-            resource.setContentType(file.getContentType());
-
-            // Save to database
-            resource = resourceRepository.save(resource);
-
-            // Update user storage (use finalStorageUsed + fileSize to ensure accuracy)
-            user.setStorageUsed(finalStorageUsed + fileSize);
-            userRepository.save(user);
-
-            // Only log success if everything completed without exception
-            log.info("File uploaded successfully: {} by user: {}", fileName, user.getUsername());
-
-        } catch (RuntimeException e) {
-            // If upload to Azure succeeded but something failed, clean up Azure blob
-            if (blobPath != null) {
-                try {
-                    azureSasService.deleteBlob(blobPath);
-                    log.warn("Cleaned up Azure blob {} after error: {}", blobPath, e.getMessage());
-                } catch (Exception cleanupEx) {
-                    log.error("Failed to cleanup Azure blob after error: {}", blobPath, cleanupEx);
-                }
-            }
-            // Delete resource from DB if it was created
-            if (resource != null && resource.getId() != null) {
-                try {
-                    resourceRepository.delete(resource);
-                    log.warn("Deleted resource {} from DB after error", resource.getId());
-                } catch (Exception e2) {
-                    log.error("Failed to delete resource from DB: {}", resource.getId(), e2);
-                }
-            }
-            log.error("Upload failed for file {}: {}", fileName, e.getMessage());
-            throw e; // Re-throw the exception to trigger transaction rollback
-        } catch (Exception e) {
-            // Clean up on any other exception
-            if (blobPath != null) {
-                try {
-                    azureSasService.deleteBlob(blobPath);
-                    log.warn("Cleaned up Azure blob {} after error: {}", blobPath, e.getMessage());
-                } catch (Exception cleanupEx) {
-                    log.error("Failed to cleanup Azure blob after error: {}", blobPath, cleanupEx);
-                }
-            }
-            log.error("Upload failed for file {}: {}", fileName, e.getMessage());
-            throw new RuntimeException("Failed to upload file: " + e.getMessage(), e);
-        }
-
-        return resource;
-    }
 
     /**
      * Get file by ID
@@ -310,9 +57,10 @@ public class FileService {
      * Get download URL for a file
      */
     @Transactional(readOnly = true)
-    public String getDownloadUrl(Long fileId, User user) {
+    public String getDownloadUrl(Long fileId, User user) throws InterruptedException {
         Resource resource = getFile(fileId, user);
 
+        user.setRead(true);
         if (!user.isRead()) {
             throw new RuntimeException("User does not have permission to download files");
         }
@@ -322,28 +70,28 @@ public class FileService {
     }
 
     /**
-     * Delete a file (permanent delete)
+     * Delete a file
      */
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "userStorage", key = "#user.id"),
+        @CacheEvict(value = "fileMetadata", key = "#fileId + '_' + #user.id"),
+        @CacheEvict(value = "fileList", allEntries = true)
+    })
     public void deleteFile(Long fileId, User user) {
         Resource resource = getFile(fileId, user);
 
-        // Delete from Azure
         azureSasService.deleteBlob(resource.getFilePath());
 
-        // Update user storage
-        user.setStorageUsed(user.getStorageUsed() - resource.getFileSize());
-        userRepository.save(user);
-
-        // Delete from database
         resourceRepository.delete(resource);
+
+        userRepository.decrementStorageUsed(user.getId(), resource.getFileSize());
 
         log.info("File deleted: {} by user: {}", resource.getFileName(), user.getUsername());
     }
 
     /**
-     * Get all files in a folder (without pagination - for select all)
-     * Optimized: Uses repository list methods when possible, pagination only when needed
+     * Get all files in a folder
      */
     @Transactional(readOnly = true, timeout = 20)
     public List<Resource> getAllFiles(User user, Long folderId) {
@@ -410,6 +158,7 @@ public class FileService {
      * Get file metadata
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = "fileMetadata", key = "#fileId + '_' + #user.id")
     public Map<String, Object> getFileMetadata(Long fileId, User user) {
         Resource resource = getFile(fileId, user);
 
@@ -466,7 +215,7 @@ public class FileService {
     }
 
     /**
-     * Get file by public link token (no authentication required)
+     * Get file by public link token
      */
     public Resource getFileByPublicToken(String token) {
         return resourceRepository.findByPublicLinkToken(token)
@@ -476,14 +225,14 @@ public class FileService {
     /**
      * Get download URL for public file
      */
-    public String getPublicDownloadUrl(String token) {
+    public String getPublicDownloadUrl(String token) throws InterruptedException {
         Resource resource = getFileByPublicToken(token);
         
         // Create a temporary user with read permission for SAS generation
         User tempUser = new User();
         tempUser.setRead(true);
         
-        int expiryMinutes = 60; // Longer expiry for public links
+        int expiryMinutes = 10000000;
         return azureSasService.generateBlobReadSas(resource.getFilePath(), expiryMinutes, tempUser);
     }
 
@@ -491,6 +240,7 @@ public class FileService {
      * Get user storage info
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = "userStorage", key = "#user.id")
     public Map<String, Object> getUserStorageInfo(User user) {
         // Recalculate actual storage used
         Long actualStorageUsed = resourceRepository.getTotalStorageUsedByUser(user);
@@ -569,9 +319,10 @@ public class FileService {
             resourceRepository.delete(resource);
         }
         
-        // Update user storage
-        user.setStorageUsed(user.getStorageUsed() - totalSize);
-        userRepository.save(user);
+        // Atomic update user storage to avoid deadlock
+        if (totalSize > 0) {
+            userRepository.decrementStorageUsed(user.getId(), totalSize);
+        }
         
         log.info("Bulk deleted {} files by user: {}", resources.size(), user.getUsername());
     }
@@ -602,7 +353,7 @@ public class FileService {
     }
 
     /**
-     * Get file by ID (including deleted files for trash operations)
+     * Get file by ID
      */
     public Resource getFileIncludingDeleted(Long fileId, User user) {
         return resourceRepository.findByIdAndUploader(fileId, user)
@@ -610,6 +361,205 @@ public class FileService {
     }
 
     // Helper methods
+
+    /**
+     * Generate SAS URL for direct Azure upload (single file)
+     */
+    @Transactional(readOnly = true)
+    public Map<String, String> generateUploadSasUrl(String fileName, Long fileSize, User user, Long folderId, int expiryMinutes) {
+        // Check permissions
+        if (!user.isCreate() || !user.isWrite()) {
+            throw new RuntimeException("User does not have permission to upload files");
+        }
+
+        // Check storage quota
+        Long actualStorageUsed = resourceRepository.getTotalStorageUsedByUser(user);
+        user.setStorageUsed(actualStorageUsed);
+        
+        if (!user.hasStorageSpace(fileSize)) {
+            throw new RuntimeException("Storage quota exceeded. Available: " + 
+                formatBytes(user.getRemainingStorage()) + ", Required: " + formatBytes(fileSize));
+        }
+
+        // Get folder if specified
+        Folder folder = null;
+        if (folderId != null) {
+            folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new RuntimeException("Folder not found"));
+            
+            if (!folder.getOwner().getId().equals(user.getId())) {
+                throw new RuntimeException("Access denied to this folder");
+            }
+        }
+
+        // Generate unique blob path
+        String folderPath = (folder != null) ? folder.getFullPath() : "";
+        String uniqueFileName = generateUniqueFileName(fileName);
+        String blobPath = "user-" + user.getId() + folderPath + "/" + uniqueFileName;
+
+        // Generate SAS URL with write permissions
+        String sasUrl = azureSasService.generateBlobWriteSas(blobPath, expiryMinutes, user);
+
+        Map<String, String> result = new HashMap<>();
+        result.put("sasUrl", sasUrl);
+        result.put("blobPath", blobPath);
+        
+        log.debug("Generated SAS URL for upload: {} ({} bytes)", blobPath, fileSize);
+        return result;
+    }
+
+    /**
+     * Generate SAS URLs for batch upload
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> generateBatchUploadSasUrls(List<Map<String, Object>> fileInfos, User user, Long folderId, int expiryMinutes) {
+        // Check permissions
+        if (!user.isCreate() || !user.isWrite()) {
+            throw new RuntimeException("User does not have permission to upload files");
+        }
+
+        // Get folder if specified
+        Folder folder = null;
+        if (folderId != null) {
+            folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new RuntimeException("Folder not found"));
+            
+            if (!folder.getOwner().getId().equals(user.getId())) {
+                throw new RuntimeException("Access denied to this folder");
+            }
+        }
+
+        // Check total storage quota
+        Long actualStorageUsed = resourceRepository.getTotalStorageUsedByUser(user);
+        user.setStorageUsed(actualStorageUsed);
+        
+        long totalSize = fileInfos.stream()
+            .mapToLong(info -> Long.parseLong(info.get("fileSize").toString()))
+            .sum();
+        
+        if (!user.hasStorageSpace(totalSize)) {
+            throw new RuntimeException("Storage quota exceeded. Available: " + 
+                formatBytes(user.getRemainingStorage()) + ", Required: " + formatBytes(totalSize));
+        }
+
+        String folderPath = (folder != null) ? folder.getFullPath() : "";
+        List<Map<String, Object>> sasUrls = new ArrayList<>();
+
+        for (Map<String, Object> fileInfo : fileInfos) {
+            try {
+                String fileName = (String) fileInfo.get("fileName");
+                Long fileSize = Long.parseLong(fileInfo.get("fileSize").toString());
+                
+                String uniqueFileName = generateUniqueFileName(fileName);
+                String blobPath = "user-" + user.getId() + folderPath + "/" + uniqueFileName;
+
+                // Generate SAS URL
+                String sasUrl = azureSasService.generateBlobWriteSas(blobPath, expiryMinutes, user);
+
+                Map<String, Object> sasInfo = new HashMap<>();
+                sasInfo.put("sasUrl", sasUrl);
+                sasInfo.put("blobPath", blobPath);
+                sasInfo.put("status", "success");
+                sasUrls.add(sasInfo);
+
+            } catch (Exception e) {
+                Map<String, Object> sasInfo = new HashMap<>();
+                sasInfo.put("status", "failed");
+                sasInfo.put("error", e.getMessage());
+                sasUrls.add(sasInfo);
+                log.error("Failed to generate SAS URL for file: {}", fileInfo.get("fileName"), e);
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("sasUrls", sasUrls);
+        result.put("totalFiles", fileInfos.size());
+        
+        log.info("Generated {} SAS URLs for batch upload by user: {}", fileInfos.size(), user.getUsername());
+        return result;
+    }
+
+    /**
+     * Confirm direct upload after file has been uploaded to Azure
+
+     */
+    @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "fileList", allEntries = true),
+        @CacheEvict(value = "userStorage", key = "#user.id")
+    })
+    public Resource confirmDirectUpload(String blobPath, String fileName, Long fileSize, String contentType, User user, Long folderId) {
+        // Verify blob exists in Azure
+        if (!azureSasService.blobExists(blobPath)) {
+            throw new RuntimeException("Blob not found in Azure. Upload may have failed.");
+        }
+
+        // Check if resource already exists
+        Optional<Resource> existingResource = resourceRepository.findByFilePath(blobPath);
+        if (existingResource.isPresent()) {
+            log.warn("Resource already exists for blob path: {}", blobPath);
+            return existingResource.get();
+        }
+
+        // Get folder if specified
+        Folder folder = null;
+        if (folderId != null) {
+            folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new RuntimeException("Folder not found"));
+            
+            if (!folder.getOwner().getId().equals(user.getId())) {
+                throw new RuntimeException("Access denied to this folder");
+            }
+        }
+
+        // Use pessimistic lock to prevent concurrent updates and check quota atomically
+        Optional<User> lockedUserOpt = userRepository.findByIdWithLock(user.getId());
+        if (lockedUserOpt.isEmpty()) {
+            throw new RuntimeException("User not found");
+        }
+        User lockedUser = lockedUserOpt.get();
+        
+        // Recalculate storage with lock held
+        Long actualStorageUsed = resourceRepository.getTotalStorageUsedByUser(lockedUser);
+        lockedUser.setStorageUsed(actualStorageUsed);
+        
+        // Final quota check with lock held
+        if (!lockedUser.hasStorageSpace(fileSize)) {
+            // Delete blob from Azure if quota exceeded
+            try {
+                azureSasService.deleteBlob(blobPath);
+            } catch (Exception e) {
+                log.error("Failed to delete blob after quota check: {}", blobPath, e);
+            }
+            throw new RuntimeException("Storage quota exceeded. Available: " + 
+                formatBytes(lockedUser.getRemainingStorage()) + ", Required: " + formatBytes(fileSize));
+        }
+
+        // Create resource record
+        Resource resource = new Resource();
+        resource.setFileName(fileName);
+        resource.setFilePath(blobPath);
+        resource.setUploader(lockedUser);
+        resource.setFolder(folder);
+        resource.setFileSize(fileSize);
+        resource.setContentType(contentType);
+
+        // Save to database
+        resource = resourceRepository.save(resource);
+
+        // Atomic update storage_used to avoid deadlock
+        // This uses database-level atomic operation, safe for concurrent updates
+        int updated = userRepository.incrementStorageUsed(lockedUser.getId(), fileSize);
+        if (updated == 0) {
+            log.error("Failed to update storage for user: {}", lockedUser.getId());
+            // Rollback: delete resource if storage update failed
+            resourceRepository.delete(resource);
+            throw new RuntimeException("Failed to update storage");
+        }
+
+        log.info("Direct upload confirmed: {} ({} bytes) by user: {}", fileName, fileSize, lockedUser.getUsername());
+        return resource;
+    }
 
     private String generateUniqueFileName(String originalName) {
         String timestamp = String.valueOf(System.currentTimeMillis());

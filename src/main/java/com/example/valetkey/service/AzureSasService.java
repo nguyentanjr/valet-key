@@ -68,12 +68,11 @@ public class AzureSasService {
         BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("valet-demo");
         BlobClient blobClient = containerClient.getBlobClient(blobName);
 
-        // Tạo SAS permission với đầy đủ quyền cho upload
         BlobSasPermission permission = new BlobSasPermission();
-        permission.setCreatePermission(true);  // Cho phép tạo blob mới
-        permission.setWritePermission(true);   // Cho phép ghi
-        permission.setAddPermission(true);     // Cho phép thêm block
-        permission.setDeletePermission(false); // Không cho phép xóa
+        permission.setCreatePermission(true);
+        permission.setWritePermission(true);
+        permission.setAddPermission(true);
+        permission.setDeletePermission(false);
 
         OffsetDateTime expiryTime = OffsetDateTime.now().plusMinutes(expiryMinutes);
         BlobServiceSasSignatureValues sasValues = new BlobServiceSasSignatureValues(expiryTime, permission);

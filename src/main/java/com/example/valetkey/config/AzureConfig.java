@@ -26,15 +26,14 @@ public class AzureConfig {
     @Primary
     public BlobServiceClient blobServiceClient() {
         RequestRetryOptions noRetryOptions = new RequestRetryOptions(
-                RetryPolicyType.FIXED,     // hoặc EXPONENTIAL đều được, không quan trọng
-                1,                         // maxTries = 1 → không retry lần nào
-                Duration.ofSeconds(3),     // tryTimeout = 2s ← cái bạn cần
-                null,                      // retryDelay → để null vì không retry
-                null,                      // maxRetryDelay → để null
-                null                       // secondaryHost
+                RetryPolicyType.FIXED,
+                1,
+                Duration.ofSeconds(3),
+                null,
+                null,
+                null
         );
 
-        // Tùy chọn: thêm low-level timeout để chắc chắn fail trong 2s
         HttpClient httpClient = new NettyAsyncHttpClientBuilder()
                 .connectTimeout(Duration.ofSeconds(3))
                 .readTimeout(Duration.ofSeconds(3))
@@ -43,8 +42,8 @@ public class AzureConfig {
 
         return new BlobServiceClientBuilder()
                 .connectionString(connectionString)
-                .retryOptions(noRetryOptions)    // ← quan trọng: maxTries = 1
-                .httpClient(httpClient)          // ← chắc chắn timeout 2s
+                .retryOptions(noRetryOptions)
+                .httpClient(httpClient)
                 .buildClient();
     }
 

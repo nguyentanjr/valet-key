@@ -1,72 +1,52 @@
 package com.example.valetkey.config;
 
-import com.github.benmanes.caffeine.cache.Caffeine;
-import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
-import org.springframework.cache.caffeine.CaffeineCache;
-import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
 
-import java.util.Arrays;
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 
 @Configuration
 @EnableCaching
 public class CacheConfig {
 
-    /**
-     * Configure cache manager with different TTL for each cache type.
-     * Each cache has its own configuration based on data characteristics.
-     * 
-     * TTL Strategy:
-     * - Short TTL (30s-1min): Frequently changing data (file list, storage)
-     * - Medium TTL (2-5min): Moderately changing data (search results)
-     * - Long TTL (9-15min): Rarely changing data (SAS URLs, metadata, folders)
-     */
     @Bean
-    public CacheManager cacheManager() {
-        SimpleCacheManager cacheManager = new SimpleCacheManager();
-        
-        cacheManager.setCaches(Arrays.asList(
-            // SAS URLs - 9 minutes (slightly less than SAS expiry of 10 min)
-            // Rarely changes, safe to cache long
-            buildCache("sasUrls", 500, 9, TimeUnit.MINUTES),
-            
-            // File metadata - 15 minutes (rarely changes after upload)
-            // Individual file properties don't change often
-            buildCache("fileMetadata", 1000, 15, TimeUnit.MINUTES),
-            
-            // File list - 1 minute (changes frequently with uploads/deletes/renames/moves)
-            // Users need to see new files immediately after upload
-            buildCache("fileList", 200, 1, TimeUnit.MINUTES),
-            
-            // User storage info - 1 minute (updates on every upload/delete)
-            // Critical for quota enforcement, must be accurate
-            buildCache("userStorage", 100, 1, TimeUnit.MINUTES),
-            
-            // Folder tree - 5 minutes (changes when folders created/deleted/renamed)
-            // Less frequent than file operations
-            buildCache("folderTree", 200, 5, TimeUnit.MINUTES),
-            
-            // Search results - 2 minutes (can change with new uploads matching query)
-            // Balance between performance and freshness
-            buildCache("searchResults", 300, 2, TimeUnit.MINUTES)
-        ));
-        
-        return cacheManager;
-    }
+    public CacheManager cacheManager(RedisConnectionFactory redisConnectionFactory) {
 
-    /**
-     * Build a Caffeine cache with specific configuration
-     */
-    private Cache buildCache(String name, int maxSize, long ttl, TimeUnit timeUnit) {
-        return new CaffeineCache(name, Caffeine.newBuilder()
-            .maximumSize(maxSize)
-            .expireAfterWrite(ttl, timeUnit)
-            .recordStats()
-            .build());
+        RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
+            .entryTtl(Duration.ofMinutes(10))
+            .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
+            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()))
+            .disableCachingNullValues();
+        
+        Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
+        
+        cacheConfigurations.put("sasUrls", defaultConfig.entryTtl(Duration.ofMinutes(9)));
+        
+        cacheConfigurations.put("fileMetadata", defaultConfig.entryTtl(Duration.ofMinutes(15)));
+        
+        cacheConfigurations.put("fileList", defaultConfig.entryTtl(Duration.ofMinutes(1)));
+        
+        cacheConfigurations.put("userStorage", defaultConfig.entryTtl(Duration.ofMinutes(1)));
+        
+        cacheConfigurations.put("folderTree", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        
+        cacheConfigurations.put("searchResults", defaultConfig.entryTtl(Duration.ofMinutes(2)));
+        
+        return RedisCacheManager.builder(redisConnectionFactory)
+            .cacheDefaults(defaultConfig)
+            .withInitialCacheConfigurations(cacheConfigurations)
+            .transactionAware()
+            .build();
     }
 }
 

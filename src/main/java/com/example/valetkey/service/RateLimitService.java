@@ -2,19 +2,31 @@ package com.example.valetkey.service;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
+import io.github.bucket4j.BucketConfiguration;
+import io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
 public class RateLimitService {
 
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private final LettuceBasedProxyManager<String> proxyManager;
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    @Autowired
+    public RateLimitService(LettuceBasedProxyManager<String> proxyManager,
+                           RedisTemplate<String, Object> redisTemplate) {
+        this.proxyManager = proxyManager;
+        this.redisTemplate = redisTemplate;
+    }
 
 
     public enum RateLimitType {
@@ -71,21 +83,26 @@ public class RateLimitService {
     }
 
 
+    /**
+     * Resolve or create bucket from Redis
+     * Buckets are stored in Redis and shared across all instances
+     */
     public Bucket resolveBucket(String key, RateLimitType type) {
-        return buckets.computeIfAbsent(key, k -> createBucket(type));
-    }
-
-
-    private Bucket createBucket(RateLimitType type) {
-        // Best Practice: Use greedy refill for smoother rate limiting
-        Bandwidth limit = Bandwidth.builder()
-            .capacity(type.getCapacity())
-            .refillGreedy(type.getCapacity(), type.getRefillDuration())
-            .build();
+        // Create bucket configuration supplier
+        Supplier<BucketConfiguration> configurationSupplier = () -> {
+            Bandwidth limit = Bandwidth.builder()
+                .capacity(type.getCapacity())
+                .refillGreedy(type.getCapacity(), type.getRefillDuration())
+                .build();
             
-        return Bucket.builder()
-            .addLimit(limit)
-            .build();
+            return BucketConfiguration.builder()
+                .addLimit(limit)
+                .build();
+        };
+        
+        // Get or create bucket from Redis
+        return proxyManager.builder()
+            .build(key, configurationSupplier);
     }
 
     /**
@@ -133,11 +150,49 @@ public class RateLimitService {
     }
 
     /**
-     * Clear all buckets (for testing or admin purposes)
+     * Clear bucket for a specific key (for testing or admin purposes)
+     * The key should be the full key (e.g., "user:1:UPLOAD_SMALL")
+     */
+    public void clearBucket(String key, RateLimitType type) {
+        // Key already contains type (e.g., "user:1:UPLOAD_SMALL")
+        // So we use it directly
+        try {
+            log.info("Bucket clear requested for key: {} (type: {})", key, type);
+            // Delete the key from Redis
+            redisTemplate.delete(key);
+        } catch (Exception e) {
+            log.error("Failed to clear bucket for key: {}", key, e);
+        }
+    }
+
+    /**
+     * Clear all rate limit buckets (for testing or admin purposes)
+     * This will delete all keys matching the bucket pattern from Redis
+     * Pattern: user:*, ip:*, token:*
      */
     public void clearAllBuckets() {
-        buckets.clear();
-        log.info("All rate limit buckets cleared");
+        try {
+            int deletedCount = 0;
+            
+            // Delete all keys matching bucket patterns
+            Set<String> userKeys = redisTemplate.keys("user:*");
+            Set<String> ipKeys = redisTemplate.keys("ip:*");
+            Set<String> tokenKeys = redisTemplate.keys("token:*");
+            
+            if (userKeys != null && !userKeys.isEmpty()) {
+                deletedCount += redisTemplate.delete(userKeys).intValue();
+            }
+            if (ipKeys != null && !ipKeys.isEmpty()) {
+                deletedCount += redisTemplate.delete(ipKeys).intValue();
+            }
+            if (tokenKeys != null && !tokenKeys.isEmpty()) {
+                deletedCount += redisTemplate.delete(tokenKeys).intValue();
+            }
+            
+            log.info("Cleared {} rate limit buckets from Redis", deletedCount);
+        } catch (Exception e) {
+            log.error("Failed to clear all buckets", e);
+        }
     }
 
     /**

@@ -98,18 +98,17 @@ public class MonitoringController {
                 stats.put("name", cacheName);
                 stats.put("nativeCache", cache.getNativeCache().getClass().getSimpleName());
                 
-                // Try to get Caffeine stats if available
+                // Redis cache stats
                 Object nativeCache = cache.getNativeCache();
-                if (nativeCache instanceof com.github.benmanes.caffeine.cache.Cache) {
-                    com.github.benmanes.caffeine.cache.Cache<?, ?> caffeineCache = 
-                        (com.github.benmanes.caffeine.cache.Cache<?, ?>) nativeCache;
-                    
-                    var cacheStats2 = caffeineCache.stats();
-                    stats.put("hitCount", cacheStats2.hitCount());
-                    stats.put("missCount", cacheStats2.missCount());
-                    stats.put("hitRate", cacheStats2.hitRate());
-                    stats.put("evictionCount", cacheStats2.evictionCount());
-                    stats.put("estimatedSize", caffeineCache.estimatedSize());
+                if (nativeCache instanceof org.springframework.data.redis.cache.RedisCache) {
+                    org.springframework.data.redis.cache.RedisCache redisCache = 
+                        (org.springframework.data.redis.cache.RedisCache) nativeCache;
+                    stats.put("cacheType", "Redis");
+                    stats.put("cacheName", redisCache.getName());
+                    // Note: Redis cache doesn't provide detailed stats like Caffeine
+                    // Would need to query Redis directly for key count and other metrics
+                } else {
+                    stats.put("cacheType", nativeCache.getClass().getSimpleName());
                 }
                 
                 cacheStats.put(cacheName, stats);

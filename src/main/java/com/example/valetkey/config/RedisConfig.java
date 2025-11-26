@@ -1,0 +1,94 @@
+package com.example.valetkey.config;
+
+import io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager;
+import io.lettuce.core.RedisClient;
+import io.lettuce.core.RedisURI;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.codec.ByteArrayCodec;
+import io.lettuce.core.codec.RedisCodec;
+import io.lettuce.core.codec.StringCodec;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+import java.time.Duration;
+
+@Configuration
+public class RedisConfig {
+
+    @Value("${spring.data.redis.host:localhost}")
+    private String redisHost;
+
+    @Value("${spring.data.redis.port:6379}")
+    private int redisPort;
+
+    @Value("${spring.data.redis.password:}")
+    private String redisPassword;
+
+    @Value("${spring.data.redis.database:0}")
+    private int redisDatabase;
+
+
+    @Bean
+    public RedisConnectionFactory redisConnectionFactory() {
+        LettuceConnectionFactory factory = new LettuceConnectionFactory();
+        factory.setHostName(redisHost);
+        factory.setPort(redisPort);
+        if (redisPassword != null && !redisPassword.isEmpty()) {
+            factory.setPassword(redisPassword);
+        }
+        factory.setDatabase(redisDatabase);
+        return factory;
+    }
+
+
+    @Bean
+    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
+        RedisTemplate<String, Object> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+        GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer();
+        template.setKeySerializer(new StringRedisSerializer());
+        template.setValueSerializer(jsonSerializer);
+        template.setHashKeySerializer(new StringRedisSerializer());
+        template.setHashValueSerializer(jsonSerializer);
+        template.afterPropertiesSet();
+        return template;
+    }
+
+    @Bean
+    public RedisClient bucket4jRedisClient() {
+        RedisURI.Builder uriBuilder = RedisURI.builder()
+                .withHost(redisHost)
+                .withPort(redisPort)
+                .withDatabase(redisDatabase);
+        
+        if (redisPassword != null && !redisPassword.isEmpty()) {
+            uriBuilder.withPassword(redisPassword.toCharArray());
+        }
+        
+        return RedisClient.create(uriBuilder.build());
+    }
+
+
+    @Bean
+    public StatefulRedisConnection<String, byte[]> bucket4jRedisConnection(RedisClient redisClient) {
+        return redisClient.connect(RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE));
+    }
+
+
+    @Bean
+    public LettuceBasedProxyManager<String> bucket4jProxyManager(
+            StatefulRedisConnection<String, byte[]> connection) {
+        return LettuceBasedProxyManager.builderFor(connection)
+                .withExpirationStrategy(io.github.bucket4j.distributed.ExpirationAfterWriteStrategy
+                        .basedOnTimeForRefillingBucketUpToMax(Duration.ofHours(24)))
+                .build();
+    }
+}
+
+

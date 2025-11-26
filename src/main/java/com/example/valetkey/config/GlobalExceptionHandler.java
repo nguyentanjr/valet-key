@@ -17,7 +17,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public Map<String, Object> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
-        // Log only if it's not a common browser request (like favicon or OPTIONS)
         String method = ex.getMethod();
         if (!"OPTIONS".equals(method) && !ex.getMessage().contains("favicon")) {
             log.warn("Method not supported: {} for URL: {}", method, ex.getMessage());
@@ -28,9 +27,7 @@ public class GlobalExceptionHandler {
         );
     }
 
-    /**
-     * Handle Circuit Breaker OPEN state - when service is temporarily unavailable
-     */
+
     @ExceptionHandler(CallNotPermittedException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public Map<String, Object> handleCircuitBreakerOpen(CallNotPermittedException ex) {
@@ -43,16 +40,12 @@ public class GlobalExceptionHandler {
         );
     }
 
-    /**
-     * Handle RuntimeException from Circuit Breaker fallback methods
-     * Check if message indicates Circuit Breaker issue
-     */
+
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Map<String, Object> handleRuntimeException(RuntimeException ex) {
         String message = ex.getMessage();
         
-        // Check if this is a Circuit Breaker related error
         if (message != null && (
             message.contains("temporarily unavailable") ||
             message.contains("tạm thời quá tải") ||

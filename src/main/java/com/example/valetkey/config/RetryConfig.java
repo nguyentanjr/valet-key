@@ -2,12 +2,14 @@ package com.example.valetkey.config;
 
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryRegistry;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@Slf4j
 public class RetryConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(RetryConfig.class);
 
     public RetryConfig(RetryRegistry registry) {
         Retry retry = registry.retry("azureService");

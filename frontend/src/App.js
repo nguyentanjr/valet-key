@@ -20,9 +20,12 @@ function App() {
       const response = await authAPI.getCurrentUser();
       if (response.data) {
         setUser(response.data);
+      } else {
+        setUser(null);
       }
     } catch (err) {
-      // Not logged in
+      // Not logged in or session expired
+      // This is normal when user hasn't logged in yet or session expired
       setUser(null);
     } finally {
       setLoading(false);

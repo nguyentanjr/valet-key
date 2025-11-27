@@ -1,19 +1,11 @@
 package com.example.valetkey.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.experimental.Accessors;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
 @Table(name = "\"user\"") // Quoted to avoid PostgreSQL reserved keyword "user"
-@Accessors(chain = true)
 public class User {
 
     @Id
@@ -49,13 +41,159 @@ public class User {
         ROLE_ADMIN
     }
 
+    // Constructors
+    public User() {
+    }
+
     public User(String username, String password) {
         this.username = username;
         this.password = password;
     }
 
+    public User(Long id, String username, String password, boolean create, boolean write, boolean read, LocalDateTime createdAt, Role role, Long storageQuota, Long storageUsed) {
+        this.id = id;
+        this.username = username;
+        this.password = password;
+        this.create = create;
+        this.write = write;
+        this.read = read;
+        this.createdAt = createdAt;
+        this.role = role;
+        this.storageQuota = storageQuota;
+        this.storageUsed = storageUsed;
+    }
+
+    // Getters
+    public Long getId() {
+        return id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
     public String getPassword() {
-        return this.password;
+        return password;
+    }
+
+    public boolean isCreate() {
+        return create;
+    }
+
+    public boolean isWrite() {
+        return write;
+    }
+
+    public boolean isRead() {
+        return read;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public Long getStorageQuota() {
+        return storageQuota;
+    }
+
+    public Long getStorageUsed() {
+        return storageUsed;
+    }
+
+    // Setters
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public void setCreate(boolean create) {
+        this.create = create;
+    }
+
+    public void setWrite(boolean write) {
+        this.write = write;
+    }
+
+    public void setRead(boolean read) {
+        this.read = read;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
+
+    public void setStorageQuota(Long storageQuota) {
+        this.storageQuota = storageQuota;
+    }
+
+    public void setStorageUsed(Long storageUsed) {
+        this.storageUsed = storageUsed;
+    }
+
+    // Chain setters (for fluent API)
+    public User id(Long id) {
+        this.id = id;
+        return this;
+    }
+
+    public User username(String username) {
+        this.username = username;
+        return this;
+    }
+
+    public User password(String password) {
+        this.password = password;
+        return this;
+    }
+
+    public User create(boolean create) {
+        this.create = create;
+        return this;
+    }
+
+    public User write(boolean write) {
+        this.write = write;
+        return this;
+    }
+
+    public User read(boolean read) {
+        this.read = read;
+        return this;
+    }
+
+    public User createdAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+        return this;
+    }
+
+    public User role(Role role) {
+        this.role = role;
+        return this;
+    }
+
+    public User storageQuota(Long storageQuota) {
+        this.storageQuota = storageQuota;
+        return this;
+    }
+
+    public User storageUsed(Long storageUsed) {
+        this.storageUsed = storageUsed;
+        return this;
     }
 
     // Check if user has enough storage space

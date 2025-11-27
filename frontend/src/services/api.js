@@ -1,17 +1,17 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'http://localhost'; // luôn gọi vào Nginx
 
-// Create axios instance with default config
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  withCredentials: true, // Important for session cookies
-  headers: {
-    'Content-Type': 'application/json',
-  },
+    baseURL: API_BASE_URL,
+    withCredentials: true,
+    headers: {
+        'Content-Type': 'application/json',
+    },
 });
 
-// Response interceptor to handle Circuit Breaker errors
+
+// Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -25,6 +25,13 @@ api.interceptors.response.use(
         error.isCircuitBreakerError = true;
         error.circuitBreakerMessage = data?.message || 'The system is temporarily overloaded. Please try again later.';
         error.retryAfter = data?.retryAfter || 60;
+      }
+      
+      // 401 Unauthorized - session might have expired or invalid
+      // This can happen when load balancer routes to a different backend instance
+      if (status === 401) {
+        error.isUnauthorized = true;
+        // Don't auto-redirect here, let components handle it
       }
     }
     

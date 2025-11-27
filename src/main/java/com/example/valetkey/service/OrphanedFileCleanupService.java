@@ -5,7 +5,8 @@ import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.models.BlobItem;
 import com.azure.storage.blob.models.ListBlobsOptions;
 import com.example.valetkey.repository.ResourceRepository;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -17,9 +18,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-@Slf4j
 @Service
 public class OrphanedFileCleanupService {
+
+    private static final Logger log = LoggerFactory.getLogger(OrphanedFileCleanupService.class);
 
     @Autowired
     private BlobServiceClient blobServiceClient;

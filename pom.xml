@@ -83,11 +83,6 @@
             <version>12.25.1</version> <!-- kiểm tra version mới nhất -->
         </dependency>
 
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <scope>provided</scope>
-        </dependency>
 
         <!-- Reactor Core required by azure-storage-blob -->
         <dependency>

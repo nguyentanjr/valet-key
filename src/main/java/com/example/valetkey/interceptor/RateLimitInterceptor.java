@@ -5,7 +5,8 @@ import com.example.valetkey.service.RateLimitService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -13,9 +14,10 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.io.IOException;
 
-@Slf4j
 @Component
 public class RateLimitInterceptor implements HandlerInterceptor {
+
+    private static final Logger log = LoggerFactory.getLogger(RateLimitInterceptor.class);
 
     @Autowired
     private RateLimitService rateLimitService;

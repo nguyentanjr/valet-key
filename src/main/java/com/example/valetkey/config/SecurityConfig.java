@@ -19,7 +19,6 @@ import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
-import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisHttpSession;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -32,7 +31,6 @@ import java.util.Arrays;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@EnableRedisHttpSession(maxInactiveIntervalInSeconds = 1800) 
 public class SecurityConfig {
 
     private final CustomUserDetailsService customUserDetailsService;
@@ -68,6 +66,8 @@ public class SecurityConfig {
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
         
         // Configure SecurityContextRepository to persist authentication in session
+        // HttpSessionSecurityContextRepository sẽ tự động save SecurityContext vào session
+        // và Spring Session sẽ serialize nó vào Redis
         SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
         
         http
@@ -86,8 +86,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/admin/**").hasRole("ADMIN") // Admin endpoints require ADMIN role
                         .requestMatchers("/login","/logout","/h2-console/**",
-                                "/user/list-blob/**","/user/upload-sas/**","/debug/**",
-                                "/api/public/**").permitAll()
+                                "/user/list-blob/**","/user/upload-sas/**","/debug/**","/debug/session",
+                                "/api/public/**","/whoami/**").permitAll()
                         .requestMatchers("/user", "/api/**").authenticated() // User info and API endpoints require authentication
                         .anyRequest().authenticated() // All other endpoints require authentication
                 )

@@ -3,7 +3,6 @@ package com.example.valetkey.controller;
 import com.example.valetkey.model.User;
 import com.example.valetkey.repository.UserRepository;
 import com.example.valetkey.service.UserService;
-import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,8 +28,7 @@ public class AdminController {
     @PostMapping("/permission/{id}")
     public ResponseEntity<?> updateUserPermission(
             @PathVariable Long id,
-            @RequestBody Map<String, Boolean> permission,
-            HttpSession session) {
+            @RequestBody Map<String, Boolean> permission) {
 
         User user = userRepository.findById(id).orElse(null);
         if (user == null) {

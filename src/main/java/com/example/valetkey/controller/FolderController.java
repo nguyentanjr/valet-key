@@ -5,21 +5,26 @@ import com.example.valetkey.model.User;
 import com.example.valetkey.repository.UserRepository;
 import com.example.valetkey.service.FolderService;
 import jakarta.servlet.http.HttpSession;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
-@Slf4j
 @RestController
 @RequestMapping("/api/folders")
 public class FolderController {
+
+    private static final Logger log = LoggerFactory.getLogger(FolderController.class);
 
     @Autowired
     private FolderService folderService;
@@ -28,16 +33,33 @@ public class FolderController {
     private UserRepository userRepository;
 
     /**
+     * Helper method to get current user from SecurityContext
+     * Thay thế cho session.getAttribute("user") vì không còn lưu User entity vào session
+     */
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return null;
+        }
+        
+        // Lấy username từ authentication
+        String username = authentication.getName();
+        
+        // Lấy user từ database
+        Optional<User> userOpt = userRepository.findUserByUsername(username);
+        return userOpt.orElse(null);
+    }
+
+    /**
      * Create a new folder
      */
     @PostMapping("/create")
     public ResponseEntity<?> createFolder(
-            @RequestBody Map<String, Object> request,
-            HttpSession session) {
+            @RequestBody Map<String, Object> request) {
 
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
@@ -51,8 +73,6 @@ public class FolderController {
                 return ResponseEntity.badRequest()
                     .body(Map.of("message", "Folder name is required"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             Folder folder = folderService.createFolder(folderName, parentFolderId, user);
 
             return ResponseEntity.ok(Map.of(
@@ -71,15 +91,13 @@ public class FolderController {
      * Get folder metadata
      */
     @GetMapping("/{folderId}")
-    public ResponseEntity<?> getFolder(@PathVariable Long folderId, HttpSession session) {
+    public ResponseEntity<?> getFolder(@PathVariable Long folderId) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             Map<String, Object> metadata = folderService.getFolderMetadata(folderId, user);
 
             return ResponseEntity.ok(metadata);
@@ -96,17 +114,14 @@ public class FolderController {
      */
     @GetMapping("/list")
     public ResponseEntity<?> listFolders(
-            @RequestParam(value = "parentFolderId", required = false) Long parentFolderId,
-            HttpSession session) {
+            @RequestParam(value = "parentFolderId", required = false) Long parentFolderId) {
 
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             List<Folder> folders = folderService.listFolders(parentFolderId, user);
 
             return ResponseEntity.ok(Map.of(
@@ -126,15 +141,13 @@ public class FolderController {
      * Get folder tree structure
      */
     @GetMapping("/tree")
-    public ResponseEntity<?> getFolderTree(HttpSession session) {
+    public ResponseEntity<?> getFolderTree() {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             List<Map<String, Object>> tree = folderService.getFolderTree(user);
 
             return ResponseEntity.ok(Map.of("tree", tree));
@@ -153,17 +166,14 @@ public class FolderController {
     public ResponseEntity<?> getFolderContents(
             @PathVariable(required = false) Long folderId,
             @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "20") int size,
-            HttpSession session) {
+            @RequestParam(value = "size", defaultValue = "20") int size) {
 
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             Map<String, Object> contents = folderService.getFolderContents(folderId, user, page, size);
 
             return ResponseEntity.ok(contents);
@@ -181,17 +191,14 @@ public class FolderController {
     @GetMapping("/root/contents")
     public ResponseEntity<?> getRootContents(
             @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "20") int size,
-            HttpSession session) {
+            @RequestParam(value = "size", defaultValue = "20") int size) {
 
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             Map<String, Object> contents = folderService.getFolderContents(null, user, page, size);
 
             return ResponseEntity.ok(contents);
@@ -208,17 +215,14 @@ public class FolderController {
      */
     @GetMapping("/search")
     public ResponseEntity<?> searchFolders(
-            @RequestParam("query") String query,
-            HttpSession session) {
+            @RequestParam("query") String query) {
 
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             List<Folder> folders = folderService.searchFolders(query, user);
 
             return ResponseEntity.ok(Map.of(
@@ -241,17 +245,14 @@ public class FolderController {
     @DeleteMapping("/{folderId}")
     public ResponseEntity<?> deleteFolder(
             @PathVariable Long folderId,
-            @RequestParam(value = "deleteContents", defaultValue = "false") boolean deleteContents,
-            HttpSession session) {
+            @RequestParam(value = "deleteContents", defaultValue = "false") boolean deleteContents) {
 
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             folderService.deleteFolder(folderId, user, deleteContents);
 
             return ResponseEntity.ok(Map.of("message", "Folder deleted successfully"));
@@ -269,12 +270,11 @@ public class FolderController {
     @PutMapping("/{folderId}/rename")
     public ResponseEntity<?> renameFolder(
             @PathVariable Long folderId,
-            @RequestBody Map<String, String> request,
-            HttpSession session) {
+            @RequestBody Map<String, String> request) {
 
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
@@ -284,8 +284,6 @@ public class FolderController {
                 return ResponseEntity.badRequest()
                     .body(Map.of("message", "New name is required"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             Folder folder = folderService.renameFolder(folderId, newName, user);
 
             return ResponseEntity.ok(Map.of(
@@ -306,17 +304,14 @@ public class FolderController {
     @PutMapping("/{folderId}/move")
     public ResponseEntity<?> moveFolder(
             @PathVariable Long folderId,
-            @RequestParam(value = "targetParentFolderId", required = false) Long targetParentFolderId,
-            HttpSession session) {
+            @RequestParam(value = "targetParentFolderId", required = false) Long targetParentFolderId) {
 
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             Folder folder = folderService.moveFolder(folderId, targetParentFolderId, user);
 
             return ResponseEntity.ok(Map.of(
@@ -335,15 +330,13 @@ public class FolderController {
      * Get breadcrumb path for a folder
      */
     @GetMapping("/{folderId}/breadcrumb")
-    public ResponseEntity<?> getBreadcrumb(@PathVariable Long folderId, HttpSession session) {
+    public ResponseEntity<?> getBreadcrumb(@PathVariable Long folderId) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             List<Map<String, Object>> breadcrumb = folderService.getBreadcrumb(folderId, user);
 
             return ResponseEntity.ok(Map.of("breadcrumb", breadcrumb));
@@ -359,15 +352,13 @@ public class FolderController {
      * Get root breadcrumb
      */
     @GetMapping("/root/breadcrumb")
-    public ResponseEntity<?> getRootBreadcrumb(HttpSession session) {
+    public ResponseEntity<?> getRootBreadcrumb() {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             List<Map<String, Object>> breadcrumb = folderService.getBreadcrumb(null, user);
 
             return ResponseEntity.ok(Map.of("breadcrumb", breadcrumb));

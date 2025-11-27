@@ -28,9 +28,18 @@ public class AuthController {
     @Autowired
     private AuthenticationManager authenticationManager;
 
+    @GetMapping("/whoami")
+    public String whoami(HttpSession session) {
+        session.setAttribute("check", "alive"); // tạo 1 key để xem có lưu không
+        return "FROM BACKEND → " + System.getenv("HOSTNAME") +
+                " | SESSION_ID = " + session.getId();
+    }
+
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> loginRequest, 
-                                   HttpServletRequest request) {
+                                   HttpServletRequest request,
+                                   jakarta.servlet.http.HttpServletResponse response) {
         try {
             String username = loginRequest.get("username");
             String password = loginRequest.get("password");
@@ -40,22 +49,22 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(username, password)
             );
 
-            // Set authentication in SecurityContext
+
             SecurityContext securityContext = SecurityContextHolder.getContext();
             securityContext.setAuthentication(authentication);
+            
 
-            // Save SecurityContext to session so it persists across requests
             HttpSession session = request.getSession(true);
+
             session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
 
             Optional<User> userOpt = userService.findByUsername(username);
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
-                session.setAttribute("user", user);
 
-                Map<String, Object> response = new HashMap<>();
-                response.put("message", "Login successful");
-                response.put("user", Map.of(
+                Map<String, Object> responses = new HashMap<>();
+                responses.put("message", "Login successful");
+                responses.put("user", Map.of(
                         "id", user.getId(),
                         "username", user.getUsername(),
                         "role", user.getRole().toString(),
@@ -64,7 +73,7 @@ public class AuthController {
                         "write", user.isWrite()
                 ));
 
-                return ResponseEntity.ok(response);
+                return ResponseEntity.ok(responses);
             } else {
                 return ResponseEntity.status(401).body(Map.of("message", "User not found"));
             }
@@ -81,12 +90,25 @@ public class AuthController {
     }
 
     @GetMapping("/user")
-    public ResponseEntity<?> getCurrentUser(HttpSession session) {
-        User user = (User) session.getAttribute("user");
-        if (user == null) {
+    public ResponseEntity<?> getCurrentUser() {
+        // Lấy user từ SecurityContext thay vì từ session attribute
+        // Điều này đảm bảo session được share giữa các backend instances
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        
+        if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(401).body(Map.of("message", "Not authenticated"));
         }
 
+        // Lấy username từ authentication
+        String username = authentication.getName();
+        
+        // Lấy user từ database (hoặc từ CustomUserDetails nếu cần)
+        Optional<User> userOpt = userService.findByUsername(username);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("message", "User not found"));
+        }
+
+        User user = userOpt.get();
         Map<String, Object> userInfo = new HashMap<>();
         userInfo.put("id", user.getId());
         userInfo.put("username", user.getUsername());
@@ -96,5 +118,33 @@ public class AuthController {
         userInfo.put("write", user.isWrite());
 
         return ResponseEntity.ok(userInfo);
+    }
+    
+    @GetMapping("/debug/session")
+    public ResponseEntity<?> debugSession(HttpServletRequest request) {
+        Map<String, Object> debugInfo = new HashMap<>();
+        
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            debugInfo.put("sessionId", session.getId());
+            debugInfo.put("sessionCreated", session.getCreationTime());
+            debugInfo.put("lastAccessed", session.getLastAccessedTime());
+            debugInfo.put("maxInactiveInterval", session.getMaxInactiveInterval());
+            
+            SecurityContext context = (SecurityContext) session.getAttribute(
+                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+            debugInfo.put("hasSecurityContext", context != null);
+            if (context != null && context.getAuthentication() != null) {
+                debugInfo.put("username", context.getAuthentication().getName());
+                debugInfo.put("authenticated", context.getAuthentication().isAuthenticated());
+            }
+        } else {
+            debugInfo.put("sessionId", "NO_SESSION");
+        }
+        
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        debugInfo.put("securityContextAuth", auth != null ? auth.getName() : "null");
+        
+        return ResponseEntity.ok(debugInfo);
     }
 }

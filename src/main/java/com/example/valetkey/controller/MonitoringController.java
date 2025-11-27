@@ -3,7 +3,8 @@ package com.example.valetkey.controller;
 import com.example.valetkey.service.RateLimitService;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.RetryRegistry;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.http.ResponseEntity;
@@ -13,10 +14,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@Slf4j
 @RestController
 @RequestMapping("/api/admin/monitoring")
 public class MonitoringController {
+
+    private static final Logger log = LoggerFactory.getLogger(MonitoringController.class);
 
     @Autowired
     private RateLimitService rateLimitService;

@@ -1,5 +1,6 @@
 package com.example.valetkey.controller;
 
+import com.example.valetkey.model.CustomUserDetails;
 import com.example.valetkey.model.Resource;
 import com.example.valetkey.model.User;
 import com.example.valetkey.repository.ResourceRepository;
@@ -7,24 +8,29 @@ import com.example.valetkey.repository.UserRepository;
 import com.example.valetkey.service.CompressionService;
 import com.example.valetkey.service.FileService;
 import jakarta.servlet.http.HttpSession;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
-@Slf4j
 @RestController
 @RequestMapping("/api/files")
 public class FileController {
+
+    private static final Logger log = LoggerFactory.getLogger(FileController.class);
 
     @Autowired
     private FileService fileService;
@@ -39,20 +45,35 @@ public class FileController {
     private CompressionService compressionService;
 
     /**
+     * Helper method to get current user from SecurityContext
+     * Thay thế cho session.getAttribute("user") vì không còn lưu User entity vào session
+     */
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return null;
+        }
+        
+        // Lấy username từ authentication
+        String username = authentication.getName();
+        
+        // Lấy user từ database
+        Optional<User> userOpt = userRepository.findUserByUsername(username);
+        return userOpt.orElse(null);
+    }
+
+    /**
      * Generate SAS URL for direct Azure upload
      */
     @PostMapping("/upload/sas-url")
     public ResponseEntity<?> generateUploadSasUrl(
-            @RequestBody Map<String, Object> request,
-            HttpSession session) {
+            @RequestBody Map<String, Object> request) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             
             String fileName = (String) request.get("fileName");
             Long fileSize = Long.parseLong(request.get("fileSize").toString());
@@ -82,17 +103,14 @@ public class FileController {
      */
     @PostMapping("/upload/batch/sas-urls")
     public ResponseEntity<?> generateBatchUploadSasUrls(
-            @RequestBody Map<String, Object> request,
-            HttpSession session) {
+            @RequestBody Map<String, Object> request) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
 
-            User user = userRepository.getUserById(sessionUser.getId());
-            
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> files = (List<Map<String, Object>>) request.get("files");
             Long folderId = request.get("folderId") != null 
@@ -126,16 +144,13 @@ public class FileController {
      */
     @PostMapping("/upload/confirm")
     public ResponseEntity<?> confirmUpload(
-            @RequestBody Map<String, Object> request,
-            HttpSession session) {
+            @RequestBody Map<String, Object> request) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             
             String blobPath = (String) request.get("blobPath");
             String fileName = (String) request.get("fileName");
@@ -166,17 +181,16 @@ public class FileController {
 
     /**
      * Get file metadata
+     * Get file metadata
      */
     @GetMapping("/{fileId:\\d+}")
-    public ResponseEntity<?> getFile(@PathVariable Long fileId, HttpSession session) {
+    public ResponseEntity<?> getFile(@PathVariable Long fileId) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             Map<String, Object> metadata = fileService.getFileMetadata(fileId, user);
 
             return ResponseEntity.ok(metadata);
@@ -192,15 +206,13 @@ public class FileController {
      * Get download URL for a file
      */
     @GetMapping("/{fileId:\\d+}/download")
-    public ResponseEntity<?> getDownloadUrl(@PathVariable Long fileId, HttpSession session) {
+    public ResponseEntity<?> getDownloadUrl(@PathVariable Long fileId) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             String downloadUrl = fileService.getDownloadUrl(fileId, user);
 
             return ResponseEntity.ok(Map.of(
@@ -219,15 +231,13 @@ public class FileController {
      * Delete a file
      */
     @DeleteMapping("/{fileId:\\d+}")
-    public ResponseEntity<?> deleteFile(@PathVariable Long fileId, HttpSession session) {
+    public ResponseEntity<?> deleteFile(@PathVariable Long fileId) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             fileService.deleteFile(fileId, user);
 
             return ResponseEntity.ok(Map.of("message", "File deleted successfully"));
@@ -244,16 +254,13 @@ public class FileController {
      */
     @GetMapping("/all-ids")
     public ResponseEntity<?> getAllFileIds(
-            @RequestParam(value = "folderId", required = false) Long folderId,
-            HttpSession session) {
+            @RequestParam(value = "folderId", required = false) Long folderId) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             List<Resource> allFiles = fileService.getAllFiles(user, folderId);
             List<Long> fileIds = allFiles.stream()
                 .map(Resource::getId)
@@ -278,17 +285,14 @@ public class FileController {
     public ResponseEntity<?> listFiles(
             @RequestParam(value = "folderId", required = false) Long folderId,
             @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "20") int size,
-            HttpSession session) {
+            @RequestParam(value = "size", defaultValue = "20") int size) {
 
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             Page<Resource> filesPage = fileService.listFiles(user, folderId, page, size);
 
             Map<String, Object> response = new HashMap<>();
@@ -317,17 +321,14 @@ public class FileController {
     public ResponseEntity<?> searchFiles(
             @RequestParam("query") String query,
             @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "20") int size,
-            HttpSession session) {
+            @RequestParam(value = "size", defaultValue = "20") int size) {
 
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             Page<Resource> filesPage = fileService.searchFiles(user, query, page, size);
 
             Map<String, Object> response = new HashMap<>();
@@ -354,17 +355,14 @@ public class FileController {
     @PutMapping("/{fileId:\\d+}/move")
     public ResponseEntity<?> moveFile(
             @PathVariable Long fileId,
-            @RequestParam(value = "targetFolderId", required = false) Long targetFolderId,
-            HttpSession session) {
+            @RequestParam(value = "targetFolderId", required = false) Long targetFolderId) {
 
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             Resource resource = fileService.moveFile(fileId, targetFolderId, user);
 
             return ResponseEntity.ok(Map.of(
@@ -385,12 +383,11 @@ public class FileController {
     @PutMapping("/{fileId:\\d+}/rename")
     public ResponseEntity<?> renameFile(
             @PathVariable Long fileId,
-            @RequestBody Map<String, String> request,
-            HttpSession session) {
+            @RequestBody Map<String, String> request) {
 
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
@@ -400,8 +397,6 @@ public class FileController {
                 return ResponseEntity.badRequest()
                     .body(Map.of("message", "New name is required"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             Resource resource = fileService.renameFile(fileId, newName, user);
 
             return ResponseEntity.ok(Map.of(
@@ -420,15 +415,13 @@ public class FileController {
      * Generate public sharing link
      */
     @PostMapping("/{fileId:\\d+}/share")
-    public ResponseEntity<?> generatePublicLink(@PathVariable Long fileId, HttpSession session) {
+    public ResponseEntity<?> generatePublicLink(@PathVariable Long fileId) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             String token = fileService.generatePublicLink(fileId, user);
 
             return ResponseEntity.ok(Map.of(
@@ -448,15 +441,13 @@ public class FileController {
      * Revoke public sharing link
      */
     @DeleteMapping("/{fileId:\\d+}/share")
-    public ResponseEntity<?> revokePublicLink(@PathVariable Long fileId, HttpSession session) {
+    public ResponseEntity<?> revokePublicLink(@PathVariable Long fileId) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             fileService.revokePublicLink(fileId, user);
 
             return ResponseEntity.ok(Map.of("message", "Public link revoked successfully"));
@@ -472,15 +463,13 @@ public class FileController {
      * Get user storage info
      */
     @GetMapping("/storage")
-    public ResponseEntity<?> getStorageInfo(HttpSession session) {
+    public ResponseEntity<?> getStorageInfo() {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             Map<String, Object> storageInfo = fileService.getUserStorageInfo(user);
 
             return ResponseEntity.ok(storageInfo);
@@ -498,11 +487,10 @@ public class FileController {
      */
     @PostMapping("/bulk-delete")
     public ResponseEntity<?> bulkDeleteFiles(
-            @RequestBody Map<String, Object> request,
-            HttpSession session) {
+            @RequestBody Map<String, Object> request) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
@@ -528,8 +516,6 @@ public class FileController {
                     }
                 })
                 .collect(java.util.stream.Collectors.toList());
-
-            User user = userRepository.getUserById(sessionUser.getId());
             fileService.bulkDeleteFiles(fileIds, user);
 
             return ResponseEntity.ok(Map.of(
@@ -549,11 +535,10 @@ public class FileController {
      */
     @PostMapping("/bulk-move")
     public ResponseEntity<?> bulkMoveFiles(
-            @RequestBody Map<String, Object> request,
-            HttpSession session) {
+            @RequestBody Map<String, Object> request) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
@@ -593,8 +578,6 @@ public class FileController {
                     targetFolderId = Long.valueOf(targetIdObj.toString());
                 }
             }
-
-            User user = userRepository.getUserById(sessionUser.getId());
             fileService.bulkMoveFiles(fileIds, targetFolderId, user);
 
             return ResponseEntity.ok(Map.of(
@@ -614,11 +597,10 @@ public class FileController {
      */
     @PostMapping("/bulk-download")
     public ResponseEntity<?> bulkDownloadFiles(
-            @RequestBody Map<String, Object> request,
-            HttpSession session) {
+            @RequestBody Map<String, Object> request) {
         try {
-            User sessionUser = (User) session.getAttribute("user");
-            if (sessionUser == null) {
+            User user = getCurrentUser();
+            if (user == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
@@ -644,8 +626,6 @@ public class FileController {
                     }
                 })
                 .collect(java.util.stream.Collectors.toList());
-
-            User user = userRepository.getUserById(sessionUser.getId());
             
             // Get files
             List<Resource> files = resourceRepository.findByIdsAndUploader(fileIds, user);

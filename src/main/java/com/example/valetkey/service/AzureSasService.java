@@ -12,7 +12,8 @@ import com.example.valetkey.model.User;
 import com.example.valetkey.repository.ResourceRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -21,9 +22,10 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Slf4j
 @Service
 public class AzureSasService {
+
+    private static final Logger log = LoggerFactory.getLogger(AzureSasService.class);
 
     @Autowired
     private BlobServiceClient blobServiceClient;

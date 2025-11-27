@@ -1,5 +1,7 @@
 package com.example.valetkey.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
@@ -15,10 +17,12 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisHttpSession;
 
 import java.time.Duration;
 
 @Configuration
+@EnableRedisHttpSession(maxInactiveIntervalInSeconds = 1800)
 public class RedisConfig {
 
     @Value("${spring.data.redis.host:localhost}")
@@ -33,7 +37,6 @@ public class RedisConfig {
     @Value("${spring.data.redis.database:0}")
     private int redisDatabase;
 
-
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
         LettuceConnectionFactory factory = new LettuceConnectionFactory();
@@ -46,18 +49,31 @@ public class RedisConfig {
         return factory;
     }
 
-
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
-        GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer();
+        
+        // Configure ObjectMapper với JavaTimeModule để hỗ trợ LocalDateTime
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        
+        GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer(objectMapper);
         template.setKeySerializer(new StringRedisSerializer());
         template.setValueSerializer(jsonSerializer);
         template.setHashKeySerializer(new StringRedisSerializer());
         template.setHashValueSerializer(jsonSerializer);
         template.afterPropertiesSet();
         return template;
+    }
+
+    // Configure Spring Session to use JDK serialization thay vì JSON
+    // JDK serialization hoạt động tốt hơn với SecurityContext và Spring Security objects
+    // CustomUserDetails đã implement Serializable nên sẽ serialize đúng cách
+    @Bean
+    public org.springframework.data.redis.serializer.RedisSerializer<Object> springSessionDefaultRedisSerializer() {
+        return new org.springframework.data.redis.serializer.JdkSerializationRedisSerializer();
     }
 
     @Bean
@@ -74,12 +90,10 @@ public class RedisConfig {
         return RedisClient.create(uriBuilder.build());
     }
 
-
     @Bean
     public StatefulRedisConnection<String, byte[]> bucket4jRedisConnection(RedisClient redisClient) {
         return redisClient.connect(RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE));
     }
-
 
     @Bean
     public LettuceBasedProxyManager<String> bucket4jProxyManager(
@@ -90,5 +104,3 @@ public class RedisConfig {
                 .build();
     }
 }
-
-

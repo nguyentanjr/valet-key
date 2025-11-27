@@ -4,6 +4,7 @@ import { fileAPI, folderAPI } from '../services/api';
 import FileUpload from './FileUpload';
 import FileList from './FileList';
 import AdminPanel from './AdminPanel';
+import { FiCloud } from 'react-icons/fi';
 import './Dashboard.css';
 
 function Dashboard({ user, onLogout }) {
@@ -34,7 +35,7 @@ function Dashboard({ user, onLogout }) {
       console.log('⏭️ [loadData] Skipped - already loading');
       return;
     }
-    
+
     loadDataRef.current = true;
     loadData().finally(() => {
       loadDataRef.current = false;
@@ -49,7 +50,7 @@ function Dashboard({ user, onLogout }) {
       // ✅ Gọi 5 API SONG SONG (parallel) thay vì tuần tự (sequential)
       // → Tất cả requests được gửi cùng lúc → nhanh hơn!
       console.log(`📦 [loadData:${callId}] Starting 5 API calls in PARALLEL...`);
-      
+
       const [filesRes, foldersRes, allFoldersRes, breadcrumbRes, storageRes] = await Promise.all([
         fileAPI.list(currentFolderId, currentPage, pageSize),
         folderAPI.list(currentFolderId),
@@ -68,7 +69,7 @@ function Dashboard({ user, onLogout }) {
       setFolders(flatFolders.length > 0 ? flatFolders : folderList);
       setBreadcrumb(breadcrumbRes.data.breadcrumb || []);
       setStorageInfo(storageRes.data);
-      
+
       console.log(`✅ [loadData:${callId}] All 5 API calls completed in parallel`);
     } catch (err) {
       console.error(`❌ [loadData:${callId}] Failed to load data:`, err);
@@ -185,8 +186,8 @@ function Dashboard({ user, onLogout }) {
 
 
   const toggleFileSelection = (fileId) => {
-    setSelectedFiles(prev => 
-      prev.includes(fileId) 
+    setSelectedFiles(prev =>
+      prev.includes(fileId)
         ? prev.filter(id => id !== fileId)
         : [...prev, fileId]
     );
@@ -246,10 +247,14 @@ function Dashboard({ user, onLogout }) {
           <div className="header-user">
             {storageInfo && (
               <div className="storage-info">
-                {storageInfo.storageUsedFormatted} / {storageInfo.storageQuotaFormatted}
+                <span className="storage-label">
+                  <FiCloud className="storage-cloud-icon" size={22} />
+                  <span className="storage-label-text">Bộ nhớ</span>
+                </span>
+                <span className="storage-values">{storageInfo.storageUsedFormatted} / {storageInfo.storageQuotaFormatted}</span>
                 <span className="storage-bar">
-                  <span 
-                    className="storage-fill" 
+                  <span
+                    className="storage-fill"
                     style={{ width: `${storageInfo.usagePercentage}%` }}
                   ></span>
                 </span>
@@ -293,29 +298,29 @@ function Dashboard({ user, onLogout }) {
               <FaPlus /> New Folder
             </button>
           </div>
-          
+
           {selectedFiles.length > 0 && (
             <div className="bulk-actions">
               <span>{selectedFiles.length} selected</span>
               <button className="btn btn-success btn-small" onClick={handleBulkDownload}>
-                ⬇️ Download ({selectedFiles.length})
+                Download ({selectedFiles.length})
               </button>
-              <button className="btn btn-secondary btn-small" onClick={() => setShowFolderPicker(true)}>
-                📁 Move
+              <button className="btn btn-move btn-small" onClick={() => setShowFolderPicker(true)}>
+                Move
               </button>
-              <button 
-                className="btn btn-danger btn-small" 
+              <button
+                className="btn btn-danger btn-small"
                 onClick={handleBulkDelete}
                 disabled={isDeleting}
               >
-                {isDeleting ? '⏳ Deleting...' : `🗑️ Delete (${selectedFiles.length})`}
+                {isDeleting ? 'Deleting...' : `Delete (${selectedFiles.length})`}
               </button>
               <button className="btn btn-secondary btn-small" onClick={deselectAll}>
-                ✖️ Clear
+                Clear
               </button>
             </div>
           )}
-          
+
           <div className="toolbar-right">
             <div className="search-box">
               <input
@@ -349,30 +354,30 @@ function Dashboard({ user, onLogout }) {
         )}
 
         {/* Upload */}
-        <FileUpload 
-          currentFolderId={currentFolderId} 
+        <FileUpload
+          currentFolderId={currentFolderId}
           onUploadSuccess={loadData}
         />
 
         {/* Files */}
         <div className="card">
           <div className="card-header">
-            Files
-            {files.length > 0 && (
-              <>
-                <button className="btn btn-secondary btn-small" onClick={selectAll}>
-                  Select All (Page)
-                </button>
-                {totalItems > files.length && (
-                  <button className="btn btn-primary btn-small" onClick={selectAllRecords}>
-                    Select All Records ({totalItems})
+            <div className="card-header-left">All Files</div>
+            <div className="card-header-right">
+              {files.length > 0 && (
+                <>
+                  <button className="btn btn-secondary btn-small" onClick={selectAll}>
+                    Select All (Page)
                   </button>
-                )}
-              </>
-            )}
-            <span className="file-count">
-              ({totalItems} total)
-            </span>
+                  {totalItems > files.length && (
+                    <button className="btn btn-primary btn-small" onClick={selectAllRecords}>
+                      Select All Records ({totalItems})
+                    </button>
+                  )}
+                </>
+              )}
+              <span className="file-count">({totalItems} total)</span>
+            </div>
           </div>
           <FileList
             files={files}
@@ -470,7 +475,7 @@ function Dashboard({ user, onLogout }) {
               }}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={() => {
+              <button className="btn btn-move" onClick={() => {
                 handleBulkMove(selectedTargetFolder);
                 setShowFolderPicker(false);
                 setSelectedTargetFolder(null);

@@ -18,6 +18,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisHttpSession;
+import org.springframework.session.web.http.CookieSerializer;
+import org.springframework.session.web.http.DefaultCookieSerializer;
 
 import java.time.Duration;
 
@@ -68,12 +70,27 @@ public class RedisConfig {
         return template;
     }
 
-    // Configure Spring Session to use JDK serialization thay vì JSON
-    // JDK serialization hoạt động tốt hơn với SecurityContext và Spring Security objects
-    // CustomUserDetails đã implement Serializable nên sẽ serialize đúng cách
+
     @Bean
     public org.springframework.data.redis.serializer.RedisSerializer<Object> springSessionDefaultRedisSerializer() {
         return new org.springframework.data.redis.serializer.JdkSerializationRedisSerializer();
+    }
+
+    /**
+     * Configure CookieSerializer để Spring Session quản lý cookie đúng cách.
+     * Dùng DefaultCookieSerializer (đã được Spring test kỹ) thay vì custom implementation.
+     * DefaultCookieSerializer sẽ tự động handle encoding/decoding cookie value.
+     */
+    @Bean
+    public CookieSerializer cookieSerializer() {
+        DefaultCookieSerializer serializer = new DefaultCookieSerializer();
+        serializer.setCookieName("SESSION");
+        serializer.setCookiePath("/");
+        serializer.setUseHttpOnlyCookie(false); // Từ application.properties
+        serializer.setUseSecureCookie(false);   // Từ application.properties
+        serializer.setSameSite("Lax");          // Từ application.properties
+        serializer.setCookieMaxAge(1800);       // 30 minutes
+        return serializer;
     }
 
     @Bean

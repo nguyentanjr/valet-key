@@ -24,7 +24,7 @@ body {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   padding: 1rem 2rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .header-content {
@@ -108,6 +108,16 @@ body {
   font-size: 0.85rem;
 }
 
+.btn-move {
+  background: #FFD767;
+  color: white;
+}
+
+.btn-move:hover {
+  background: #ffd056;
+  transform: translateY(-1px);
+}
+
 /* Container */
 .container {
   max-width: 1400px;
@@ -120,7 +130,7 @@ body {
 .card {
   background: white;
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
   margin-bottom: 1.5rem;
   overflow: visible;
@@ -136,15 +146,31 @@ body {
 }
 
 .card:has(.file-list) {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
   font-size: 1.25rem;
   font-weight: 600;
   margin-bottom: 1rem;
   color: #333;
+}
+
+.card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card-header-left {
+  flex: 1;
 }
 
 /* Forms */
@@ -192,8 +218,13 @@ body {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Error */
@@ -279,18 +310,17 @@ body {
   .container {
     padding: 1rem;
   }
-  
+
   .header {
     padding: 1rem;
   }
-  
+
   .header h1 {
     font-size: 1.2rem;
   }
-  
+
   .btn {
     padding: 0.4rem 0.8rem;
     font-size: 0.85rem;
   }
 }
-

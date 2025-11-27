@@ -36,7 +36,7 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
 
   const handleDelete = async (fileId, fileName) => {
     if (!window.confirm(`Delete "${fileName}"?`)) return;
-    
+
     setDeletingFiles(prev => new Set(prev).add(fileId));
     try {
       await fileAPI.delete(fileId);
@@ -59,7 +59,7 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
 
   const handlePermanentDelete = async (fileId, fileName) => {
     if (!window.confirm(`Permanently delete "${fileName}"? This action cannot be undone.`)) return;
-    
+
     setDeletingFiles(prev => new Set(prev).add(fileId));
     try {
       await fileAPI.permanentDelete(fileId);
@@ -99,7 +99,7 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
 
   const handleRevokeLink = async (fileId) => {
     if (!window.confirm('Make this file private? The public link will stop working.')) return;
-    
+
     try {
       await fileAPI.revokePublicLink(fileId);
       onFileUpdated();
@@ -115,7 +115,7 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
 
   const handleRename = async (fileId) => {
     if (!newName.trim()) return;
-    
+
     try {
       await fileAPI.rename(fileId, newName);
       setRenameModal(null);
@@ -190,8 +190,8 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
         </thead>
         <tbody>
           {files.map((file) => (
-            <tr 
-              key={file.id} 
+            <tr
+              key={file.id}
               className={`${selectedFiles.includes(file.id) ? 'selected' : ''} ${deletingFiles.has(file.id) ? 'deleting' : ''}`}
             >
               <td>
@@ -280,22 +280,12 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
         <div className="modal-overlay" onClick={() => setShareModal(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title">🔗 Public Link</h3>
+              <h3 className="modal-title" style={{ color: '#6B6BD0' }}>
+                Public Link
+              </h3>
               <button className="modal-close" onClick={() => setShareModal(null)}>×</button>
             </div>
             <div className="form-group">
-              <div style={{ 
-                padding: '0.75rem', 
-                background: '#f0fdf4', 
-                borderRadius: '6px', 
-                marginBottom: '1rem',
-                border: '1px solid #86efac'
-              }}>
-                <strong>✅ This file is public</strong>
-                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem', color: '#166534' }}>
-                  Anyone with this link can view and download this file
-                </p>
-              </div>
               <label className="form-label">Share this link:</label>
               <input
                 type="text"
@@ -304,6 +294,18 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
                 readOnly
                 onClick={(e) => e.target.select()}
               />
+              <p
+                style={{
+                  margin: '0.5rem 0 0 0',
+                  paddingLeft: '0.5rem',
+                  fontSize: '0.9rem',
+                  color: '#444746',
+                  textAlign: 'left'
+                }}
+              >
+                Anyone with this link can view and download this file
+              </p>
+
             </div>
             <div className="modal-actions">
               <button
@@ -313,7 +315,7 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
                   setShareModal(null);
                 }}
               >
-                🔒 Make Private
+                Make Private
               </button>
               <button
                 className="btn btn-primary"
@@ -322,7 +324,7 @@ function FileList({ files, onFileDeleted, onFileUpdated, folders, selectedFiles 
                   alert('Link copied to clipboard!');
                 }}
               >
-                📋 Copy Link
+                Copy Link
               </button>
             </div>
           </div>

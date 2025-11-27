@@ -100,11 +100,36 @@
   white-space: nowrap;
 }
 
+.storage-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  /* keep items on a single line */
+}
+
+.storage-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.storage-label-text {
+  font-weight: 600
+}
+
+.storage-values {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
 .storage-bar {
   display: inline-block;
   width: 80px;
   height: 4px;
-  background: rgba(255,255,255,0.3);
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 2px;
   margin-left: 0.5rem;
   overflow: hidden;
@@ -122,16 +147,34 @@
 .bulk-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
+  gap: 0.75rem;
+  /* larger gap between buttons */
+  padding: 0.75rem 1rem;
+  /* larger clickable area */
   background: #f0f9ff;
-  border-radius: 6px;
+  border-radius: 8px;
   margin-left: auto;
+  min-width: 360px;
+  /* wider so it doesn't collapse */
+  justify-content: flex-end;
 }
 
 .bulk-actions span {
-  font-weight: 500;
+  font-weight: 600;
   color: #0369a1;
+  font-size: 0.95rem;
+}
+
+/* Increase button size within bulk-actions to make them more prominent */
+.bulk-actions .btn {
+  padding: 0.6rem 0.9rem;
+  font-size: 0.95rem;
+}
+
+/* Make small buttons in bulk-actions slightly larger than global small buttons */
+.bulk-actions .btn-small {
+  padding: 0.55rem 0.9rem;
+  font-size: 0.92rem;
 }
 
 .pagination {
@@ -143,7 +186,7 @@
   padding: 1rem;
   background: white;
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .pagination button:disabled {
@@ -168,20 +211,20 @@
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .toolbar-left,
   .toolbar-right {
     width: 100%;
   }
-  
+
   .search-box {
     width: 100%;
   }
-  
+
   .search-box input {
     flex: 1;
   }
-  
+
   .folders-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   }
@@ -190,6 +233,9 @@
     flex-wrap: wrap;
     margin-left: 0;
     margin-top: 0.5rem;
+    min-width: 0;
+    /* allow wrapping on small screens */
+    justify-content: flex-start;
   }
 
   .pagination {
@@ -197,4 +243,3 @@
     gap: 0.5rem;
   }
 }
-

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaFolder, FaPlus, FaSearch } from 'react-icons/fa';
 import { fileAPI, folderAPI } from '../services/api';
 import FileUpload from './FileUpload';
@@ -26,38 +26,52 @@ function Dashboard({ user, onLogout }) {
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [selectedTargetFolder, setSelectedTargetFolder] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const loadDataRef = useRef(false); // Prevent duplicate calls
 
   useEffect(() => {
-    loadData();
+    // Skip if already loading
+    if (loadDataRef.current) {
+      console.log('⏭️ [loadData] Skipped - already loading');
+      return;
+    }
+    
+    loadDataRef.current = true;
+    loadData().finally(() => {
+      loadDataRef.current = false;
+    });
   }, [currentFolderId, currentPage]);
 
   const loadData = async () => {
+    const callId = Math.random().toString(36).substring(7);
+    console.log(`📦 [loadData] Called with ID: ${callId}`, { currentFolderId, currentPage });
     setLoading(true);
     try {
-      // Load files with pagination
-      const filesRes = await fileAPI.list(currentFolderId, currentPage, pageSize);
+      // ✅ Gọi 5 API SONG SONG (parallel) thay vì tuần tự (sequential)
+      // → Tất cả requests được gửi cùng lúc → nhanh hơn!
+      console.log(`📦 [loadData:${callId}] Starting 5 API calls in PARALLEL...`);
+      
+      const [filesRes, foldersRes, allFoldersRes, breadcrumbRes, storageRes] = await Promise.all([
+        fileAPI.list(currentFolderId, currentPage, pageSize),
+        folderAPI.list(currentFolderId),
+        folderAPI.getTree(),
+        folderAPI.getBreadcrumb(currentFolderId),
+        fileAPI.getStorageInfo()
+      ]);
+
+      // Process results
       setFiles(filesRes.data.files || []);
       setTotalPages(filesRes.data.totalPages || 0);
       setTotalItems(filesRes.data.totalItems || 0);
 
-      // Load folders
-      const foldersRes = await folderAPI.list(currentFolderId);
       const folderList = foldersRes.data.folders || [];
-
-      // Load all folders for move operation
-      const allFoldersRes = await folderAPI.getTree();
       const flatFolders = flattenFolders(allFoldersRes.data.tree || []);
       setFolders(flatFolders.length > 0 ? flatFolders : folderList);
-
-      // Load breadcrumb
-      const breadcrumbRes = await folderAPI.getBreadcrumb(currentFolderId);
       setBreadcrumb(breadcrumbRes.data.breadcrumb || []);
-
-      // Load storage info
-      const storageRes = await fileAPI.getStorageInfo();
       setStorageInfo(storageRes.data);
+      
+      console.log(`✅ [loadData:${callId}] All 5 API calls completed in parallel`);
     } catch (err) {
-      console.error('Failed to load data:', err);
+      console.error(`❌ [loadData:${callId}] Failed to load data:`, err);
     } finally {
       setLoading(false);
     }

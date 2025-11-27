@@ -139,10 +139,28 @@ function AdminPanel() {
         adminAPI.getUsers(),
         adminAPI.getStats(topN)
       ]);
-      setUsers(usersRes.data || []);
+      
+      // ✅ Backend trả về format: { users: [...] }
+      let usersData = usersRes.data;
+      
+      // Extract users array from response
+      if (usersData && Array.isArray(usersData.users)) {
+        usersData = usersData.users;
+      } else if (Array.isArray(usersData)) {
+        // Fallback: nếu response là array trực tiếp
+        usersData = usersData;
+      } else {
+        console.warn('⚠️ [AdminPanel] Unexpected users response format:', usersData);
+        usersData = [];
+      }
+      
+      setUsers(usersData);
       setStats(statsRes.data || {});
     } catch (err) {
       console.error('Failed to load admin data:', err);
+      console.error('Error response:', err.response?.data);
+      setUsers([]); // Set empty array on error
+      setStats({});
       alert(err.response?.data?.message || 'Failed to load admin data');
     } finally {
       setLoading(false);

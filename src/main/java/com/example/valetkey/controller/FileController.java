@@ -287,6 +287,9 @@ public class FileController {
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size) {
 
+        String hostname = System.getenv("HOSTNAME");
+        log.info("🖥️ [BACKEND: {}] GET /api/files/list - folderId={}, page={}, size={}", 
+                 hostname, folderId, page, size);
         try {
             User user = getCurrentUser();
             if (user == null) {
@@ -464,6 +467,8 @@ public class FileController {
      */
     @GetMapping("/storage")
     public ResponseEntity<?> getStorageInfo() {
+        String hostname = System.getenv("HOSTNAME");
+        log.info("🖥️ [BACKEND: {}] GET /api/files/storage", hostname);
         try {
             User user = getCurrentUser();
             if (user == null) {

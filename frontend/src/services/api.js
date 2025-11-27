@@ -1,19 +1,50 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost'; // luôn gọi vào Nginx
+// ✅ Trong development: dùng relative URL để đi qua React dev server proxy
+// ✅ Trong production: có thể dùng absolute URL nếu cần
+// React dev server proxy sẽ forward requests đến Nginx (port 80)
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+    ? 'http://localhost'  // Production: gọi trực tiếp đến Nginx
+    : '';                  // Development: dùng relative URL → đi qua setupProxy.js → Nginx
 
 const api = axios.create({
     baseURL: API_BASE_URL,
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
     },
 });
 
 
+// Request interceptor to log all API calls
+api.interceptors.request.use(
+  (config) => {
+    const timestamp = new Date().toISOString();
+    const method = config.method?.toUpperCase() || 'GET';
+    const url = config.url || '';
+    console.log(`🚀 [API REQUEST] ${timestamp} ${method} ${url}`, {
+      baseURL: config.baseURL,
+      params: config.params,
+    });
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Response interceptor to handle errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const timestamp = new Date().toISOString();
+    const method = response.config?.method?.toUpperCase() || 'GET';
+    const url = response.config?.url || '';
+    console.log(`✅ [API RESPONSE] ${timestamp} ${method} ${url} - Status: ${response.status}`);
+    return response;
+  },
   (error) => {
     // Check if this is a Circuit Breaker error
     if (error.response) {
@@ -191,16 +222,18 @@ export const folderAPI = {
 // Public File Access (no auth)
 export const publicAPI = {
   getFile: (token) => 
-    axios.get(`${API_BASE_URL}/api/public/files/${token}`),
+    api.get(`/api/public/files/${token}`),
   
   getDownloadUrl: (token) => 
-    axios.get(`${API_BASE_URL}/api/public/files/${token}/download`),
+    api.get(`/api/public/files/${token}/download`),
 };
 
 // Admin Operations
 export const adminAPI = {
   getUsers: () =>
-    api.get('/admin/user-list'),
+    api.get('/admin/user-list', {
+      params: { _t: Date.now() } // ✅ Add timestamp to prevent caching
+    }),
 
   updatePermissions: (userId, permissions) =>
     api.post(`/admin/permission/${userId}`, permissions),

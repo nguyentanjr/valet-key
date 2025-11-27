@@ -120,6 +120,32 @@ public class AuthController {
         return ResponseEntity.ok(userInfo);
     }
     
+    @GetMapping("/debug/role")
+    public ResponseEntity<?> debugRole() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.ok(Map.of("authenticated", false, "message", "Not authenticated"));
+        }
+        
+        Map<String, Object> debug = new HashMap<>();
+        debug.put("authenticated", true);
+        debug.put("username", authentication.getName());
+        debug.put("authorities", authentication.getAuthorities().stream()
+            .map(a -> a.getAuthority())
+            .collect(java.util.stream.Collectors.toList()));
+        debug.put("hasRole_ADMIN", authentication.getAuthorities().stream()
+            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")));
+        
+        // Get user from database
+        Optional<User> userOpt = userService.findByUsername(authentication.getName());
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            debug.put("userRole", user.getRole() != null ? user.getRole().toString() : "null");
+        }
+        
+        return ResponseEntity.ok(debug);
+    }
+    
     @GetMapping("/debug/session")
     public ResponseEntity<?> debugSession(HttpServletRequest request) {
         Map<String, Object> debugInfo = new HashMap<>();

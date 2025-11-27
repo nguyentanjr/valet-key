@@ -2,7 +2,7 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = function(app) {
   const proxyOptions = {
-    target: 'http://localhost:8080',
+    target: 'http://localhost:80', // ✅ Proxy đến Nginx (load balancer) thay vì backend trực tiếp
     changeOrigin: true,
     cookieDomainRewrite: 'localhost',
     cookiePathRewrite: '/',
@@ -14,6 +14,11 @@ module.exports = function(app) {
           return cookie.replace(/Domain=[^;]+/gi, 'Domain=localhost');
         });
       }
+      
+      // ✅ Disable caching for API requests
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     },
     onProxyReq: function(proxyReq, req, res) {
       // Forward cookies from client to backend

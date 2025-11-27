@@ -116,6 +116,8 @@ public class FolderController {
     public ResponseEntity<?> listFolders(
             @RequestParam(value = "parentFolderId", required = false) Long parentFolderId) {
 
+        String hostname = System.getenv("HOSTNAME");
+        log.info(" [BACKEND: {}] GET /api/folders/list - parentFolderId={}", hostname, parentFolderId);
         try {
             User user = getCurrentUser();
             if (user == null) {
@@ -142,6 +144,8 @@ public class FolderController {
      */
     @GetMapping("/tree")
     public ResponseEntity<?> getFolderTree() {
+        String hostname = System.getenv("HOSTNAME");
+        log.info(" [BACKEND: {}] GET /api/folders/tree", hostname);
         try {
             User user = getCurrentUser();
             if (user == null) {
@@ -331,6 +335,8 @@ public class FolderController {
      */
     @GetMapping("/{folderId}/breadcrumb")
     public ResponseEntity<?> getBreadcrumb(@PathVariable Long folderId) {
+        String hostname = System.getenv("HOSTNAME");
+        log.info(" [BACKEND: {}] GET /api/folders/{}/breadcrumb", hostname, folderId);
         try {
             User user = getCurrentUser();
             if (user == null) {
@@ -353,6 +359,8 @@ public class FolderController {
      */
     @GetMapping("/root/breadcrumb")
     public ResponseEntity<?> getRootBreadcrumb() {
+        String hostname = System.getenv("HOSTNAME");
+        log.info(" [BACKEND: {}] GET /api/folders/root/breadcrumb", hostname);
         try {
             User user = getCurrentUser();
             if (user == null) {

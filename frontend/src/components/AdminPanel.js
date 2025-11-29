@@ -5,7 +5,7 @@ import './AdminPanel.css';
 // UserRow component for individual user management
 function UserRow({ user, onUpdateQuota, onUpdatePermissions, updating }) {
   const [quotaInput, setQuotaInput] = useState((user.storageQuota || 0) / (1024 * 1024 * 1024));
-  
+
   useEffect(() => {
     setQuotaInput((user.storageQuota || 0) / (1024 * 1024 * 1024));
   }, [user.storageQuota]);
@@ -139,27 +139,25 @@ function AdminPanel() {
         adminAPI.getUsers(),
         adminAPI.getStats(topN)
       ]);
-      
-      // ✅ Backend trả về format: { users: [...] }
+
       let usersData = usersRes.data;
-      
+
       // Extract users array from response
       if (usersData && Array.isArray(usersData.users)) {
         usersData = usersData.users;
       } else if (Array.isArray(usersData)) {
-        // Fallback: nếu response là array trực tiếp
         usersData = usersData;
       } else {
         console.warn('⚠️ [AdminPanel] Unexpected users response format:', usersData);
         usersData = [];
       }
-      
+
       setUsers(usersData);
       setStats(statsRes.data || {});
     } catch (err) {
       console.error('Failed to load admin data:', err);
       console.error('Error response:', err.response?.data);
-      setUsers([]); // Set empty array on error
+      setUsers([]);
       setStats({});
       alert(err.response?.data?.message || 'Failed to load admin data');
     } finally {
@@ -298,7 +296,7 @@ function AdminPanel() {
           <ul>
             {stats.topConsumers.map((consumer) => (
               <li key={consumer.id}>
-                <strong>{consumer.username}</strong>: {formatBytes(consumer.storageUsed)} / {formatBytes(consumer.storageQuota)} 
+                <strong>{consumer.username}</strong>: {formatBytes(consumer.storageUsed)} / {formatBytes(consumer.storageQuota)}
                 ({consumer.usagePercentage ? consumer.usagePercentage.toFixed(2) : 0}%)
                 <div className="mini-bar">
                   <div

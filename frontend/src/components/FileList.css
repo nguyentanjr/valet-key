@@ -9,14 +9,17 @@
 }
 
 .file-list {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 .file-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed; /* Cho phép truncate text đúng cách */
+  table-layout: fixed;
+  /* Cho phép truncate text đúng cách */
 }
 
 .file-table thead {
@@ -33,27 +36,32 @@
 
 .file-table th:first-child,
 .file-table td:first-child {
-  width: 50px; /* Checkbox column */
+  width: 50px;
+  /* Checkbox column */
 }
 
 .file-table th:nth-child(2),
 .file-table td:nth-child(2) {
-  width: 40%; /* Name column - chiếm 40% chiều rộng */
+  width: 40%;
+  /* Name column - chiếm 40% chiều rộng */
 }
 
 .file-table th:nth-child(3),
 .file-table td:nth-child(3) {
-  width: 10%; /* Size column */
+  width: 10%;
+  /* Size column */
 }
 
 .file-table th:nth-child(4),
 .file-table td:nth-child(4) {
-  width: 15%; /* Uploaded column */
+  width: 15%;
+  /* Uploaded column */
 }
 
 .file-table th:last-child,
 .file-table td:last-child {
-  width: 35%; /* Actions column */
+  width: 35%;
+  /* Actions column */
 }
 
 .file-table td {
@@ -64,7 +72,8 @@
 }
 
 .file-table td:nth-child(2) {
-  white-space: nowrap; /* Truncate tên file dài */
+  white-space: nowrap;
+  /* Truncate tên file dài */
 }
 
 .file-table td:nth-child(3),
@@ -101,7 +110,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 500px; /* Giới hạn chiều rộng tối đa */
+  max-width: 500px;
+  /* Giới hạn chiều rộng tối đa */
 }
 
 .file-icon {
@@ -129,10 +139,10 @@
   color: #333;
 }
 
-.btn-icon.btn-danger:hover {
+/* .btn-icon.btn-danger:hover {
   background: #fee;
   color: #ef4444;
-}
+} */
 
 .btn-icon.btn-success {
   color: #10b981;
@@ -143,14 +153,14 @@
   color: #059669;
 }
 
-.btn-icon.btn-warning {
+/* .btn-icon.btn-warning {
   color: #f59e0b;
 }
 
 .btn-icon.btn-warning:hover {
   background: #fef3c7;
   color: #d97706;
-}
+} */
 
 .text-muted {
   color: #9ca3af;
@@ -159,7 +169,7 @@
 
 .public-badge {
   display: inline-block;
-  margin-left: 0.5rem;
+  margin-top: 0.2rem;
   padding: 0.2rem 0.5rem;
   background: #dbeafe;
   color: #1e40af;
@@ -179,12 +189,12 @@
   .file-table {
     font-size: 0.9rem;
   }
-  
+
   .file-table th,
   .file-table td {
     padding: 0.75rem 0.5rem;
   }
-  
+
   .file-actions {
     flex-direction: column;
     gap: 0.25rem;
@@ -204,8 +214,13 @@
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .btn-danger:disabled {
@@ -222,4 +237,3 @@
 .file-table tbody tr.deleting:hover {
   background: #fee2e2;
 }
-

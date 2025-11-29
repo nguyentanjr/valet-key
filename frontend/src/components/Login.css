@@ -11,7 +11,7 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-  padding: 2.5rem;
+  padding: 1.25rem 2.5rem 2.5rem 2.5rem;
   width: 100%;
   max-width: 420px;
 }
@@ -47,4 +47,3 @@
   color: #999;
   font-size: 0.85rem;
 }
-

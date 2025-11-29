@@ -60,7 +60,7 @@ function App() {
       <Routes>
         {/* Public file sharing route */}
         <Route path="/public/:token" element={<PublicFile />} />
-        
+
         {/* Main application routes */}
         <Route
           path="/*"

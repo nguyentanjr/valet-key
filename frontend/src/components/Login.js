@@ -29,7 +29,8 @@ function Login({ onLoginSuccess }) {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          <h1>☁️ Cloud Storage</h1>
+          <p style={{ fontSize: '6rem' }}>☁️</p>
+          <h1>Cloud Storage</h1>
           <p>Sign in to access your files</p>
         </div>
 
@@ -63,15 +64,22 @@ function Login({ onLoginSuccess }) {
 
           <button
             type="submit"
-            className="btn btn-primary btn-block"
+            className="btn btn-primary"
+            style={{
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+              padding: '0.8rem',
+            }}
             disabled={loading}
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
+
         </form>
 
         <div className="login-footer">
-          <p>Demo credentials: admin / admin123</p>
+          <p>Demo credentials: demo / 1</p>
         </div>
       </div>
     </div>

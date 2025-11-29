@@ -34,6 +34,7 @@ function Dashboard({ user, onLogout }) {
   const loadDataRef = useRef(false); // Prevent duplicate calls
   const searchBoxRef = useRef(null); // Reference for search box
 
+
   useEffect(() => {
     // Skip if already loading
     if (loadDataRef.current) {
@@ -106,42 +107,42 @@ function Dashboard({ user, onLogout }) {
 
   const loadData = async () => {
     const callId = Math.random().toString(36).substring(7);
-    console.log(`📦 [loadData] Called with ID: ${callId}`, { currentFolderId, currentPage });
+    console.log(`📦 [loadData] Called logic mới. Page: ${currentPage}`);
     setLoading(true);
-    try {
-      // ✅ Gọi 5 API SONG SONG (parallel) thay vì tuần tự (sequential)
-      // → Tất cả requests được gửi cùng lúc → nhanh hơn!
-      console.log(`📦 [loadData:${callId}] Starting 5 API calls in PARALLEL...`);
 
+    try {
+      const isFirstPage = currentPage === 0;
       const [filesRes, foldersRes, allFoldersRes, breadcrumbRes, storageRes] = await Promise.all([
         fileAPI.list(currentFolderId, currentPage, pageSize),
-        folderAPI.list(currentFolderId),
+        isFirstPage
+          ? folderAPI.list(currentFolderId)
+          : Promise.resolve({ data: { folders: [] } }),
+
         folderAPI.getTree(),
         folderAPI.getBreadcrumb(currentFolderId),
         fileAPI.getStorageInfo()
       ]);
+      const rawFiles = filesRes.data.files || [];
+      const cleanFiles = rawFiles.filter(item => {
+        return item.type !== 'folder' && !item.isDirectory;
+      });
 
-      // Process results
-      setFiles(filesRes.data.files || []);
+      setFiles(cleanFiles);
       setTotalPages(filesRes.data.totalPages || 0);
       setTotalItems(filesRes.data.totalItems || 0);
-
-      // Use folderList from current directory for display
-      // Use tree for dropdown options in move/rename
-      const folderList = foldersRes.data.folders || [];
-      const allFoldersTree = flattenFolders(allFoldersRes.data.tree || []);
-
-      // Store current directory folders for display
-      setFolders(folderList);
-      // Store all folders for dropdown in move/rename operations
-      setAllFolders(allFoldersTree);
-
+      if (isFirstPage) {
+        const rawFolders = foldersRes.data.folders || [];
+        const uniqueFolders = [...new Map(rawFolders.map(item => [item.id, item])).values()];
+        setFolders(uniqueFolders);
+      } else {
+        setFolders([]);
+      }
+      setAllFolders(flattenFolders(allFoldersRes.data.tree || []));
       setBreadcrumb(breadcrumbRes.data.breadcrumb || []);
       setStorageInfo(storageRes.data);
 
-      console.log(`✅ [loadData:${callId}] All 5 API calls completed in parallel`);
     } catch (err) {
-      console.error(`❌ [loadData:${callId}] Failed to load data:`, err);
+      console.error(`❌ Load data failed:`, err);
     } finally {
       setLoading(false);
     }
@@ -525,31 +526,30 @@ function Dashboard({ user, onLogout }) {
               onFolderDeleted={loadData}
               onNavigateToFolder={handleNavigate}
             />
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="pagination">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                  disabled={currentPage === 0}
+                >
+                  ← Previous
+                </button>
+                <span>
+                  Page {currentPage + 1} of {totalPages} ({totalItems} items)
+                </span>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
+                  disabled={currentPage >= totalPages - 1}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="pagination">
-            <button
-              className="btn btn-secondary"
-              onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
-              disabled={currentPage === 0}
-            >
-              ← Previous
-            </button>
-            <span>
-              Page {currentPage + 1} of {totalPages} ({totalItems} items)
-            </span>
-            <button
-              className="btn btn-secondary"
-              onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
-              disabled={currentPage >= totalPages - 1}
-            >
-              Next →
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Create Folder Modal */}

@@ -54,6 +54,7 @@ export default function FileUpload({ currentFolderId, onUploadSuccess }) {
   const inflightXhrsRef = useRef({});
   const overallStartRef = useRef(null);
   const overallEndRef = useRef(null);
+  const pauseStartRef = useRef(null);
 
   const resetStats = () => {
     setFileStats({});
@@ -97,7 +98,7 @@ export default function FileUpload({ currentFolderId, onUploadSuccess }) {
   const handlePause = () => {
     isPausedRef.current = true;
     setIsPaused(true);
-    // abort any in-flight requests so they stop early; they'll re-try after resume
+    pauseStartRef.current = Date.now();
     if (inflightXhrsRef.current) {
       Object.values(inflightXhrsRef.current).forEach(arr => arr.forEach(xhr => {
         try { xhr.abort(); } catch (e) { /* ignore */ }
@@ -106,6 +107,18 @@ export default function FileUpload({ currentFolderId, onUploadSuccess }) {
   };
 
   const handleResume = () => {
+    if (pauseStartRef.current) {
+      const pauseDuration = Date.now() - pauseStartRef.current;
+      if (overallStartRef.current) {
+        overallStartRef.current += pauseDuration;
+      }
+      Object.keys(startTimeRef.current).forEach(key => {
+        startTimeRef.current[key] += pauseDuration;
+      });
+
+      pauseStartRef.current = null;
+    }
+
     isPausedRef.current = false;
     setIsPaused(false);
   };
@@ -563,14 +576,14 @@ export default function FileUpload({ currentFolderId, onUploadSuccess }) {
 
   // Update elapsed time for overall upload
   useEffect(() => {
-    if (!uploading) return;
+    if (!uploading || isPaused) return;
     const interval = setInterval(() => {
       if (overallStartRef.current) {
         setElapsedTime(Math.round((Date.now() - overallStartRef.current) / 1000));
       }
     }, 500);
     return () => clearInterval(interval);
-  }, [uploading]);
+  }, [uploading, isPaused]);
 
   // ===========================================================
   // UI HELPER: BUTTON STYLES
@@ -596,7 +609,7 @@ export default function FileUpload({ currentFolderId, onUploadSuccess }) {
       <div className="upload-area">
         <FaCloudUploadAlt className="upload-icon" />
         <h3>Upload Files</h3>
-        <p>Select files and choose an upload mode to compare speeds.</p>
+        <p>Select files and choose your upload method.</p>
 
         <input id="file-input"
           type="file"
@@ -736,7 +749,7 @@ export default function FileUpload({ currentFolderId, onUploadSuccess }) {
 
         {/* Uploading Status Text */}
         {uploading && (
-          <div style={{ marginTop: 12, textAlign: 'center', color: isPaused ? 'orange' : 'green' }}>
+          <div style={{ marginTop: 12, textAlign: 'center', color: isPaused ? 'gray' : 'green' }}>
             <strong>{isPaused ? "⏸ Upload Paused" : "Uploading in progress..."}</strong>
             <div style={{ fontSize: 12, marginTop: 6 }}>
               Elapsed: {formatDuration(elapsedTime)}

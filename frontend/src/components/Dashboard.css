@@ -2,7 +2,6 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1.5rem;
   flex-wrap: wrap;
 }
 
@@ -46,7 +45,7 @@
   padding: 0.5rem 1rem;
   border: 1px solid #ddd;
   border-radius: 6px;
-  width: 250px;
+  width: 550px;
 }
 
 .search-box button {
@@ -105,7 +104,6 @@
   align-items: center;
   gap: 0.5rem;
   white-space: nowrap;
-  /* keep items on a single line */
 }
 
 .storage-label {
@@ -115,14 +113,14 @@
 }
 
 .storage-label-text {
-  font-weight: 600
+  font-weight: 600;
 }
 
 .storage-values {
   max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap
+  white-space: nowrap;
 }
 
 .storage-bar {
@@ -148,14 +146,11 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  /* larger gap between buttons */
   padding: 0.75rem 1rem;
-  /* larger clickable area */
   background: #f0f9ff;
   border-radius: 8px;
   margin-left: auto;
   min-width: 360px;
-  /* wider so it doesn't collapse */
   justify-content: flex-end;
 }
 
@@ -165,13 +160,11 @@
   font-size: 0.95rem;
 }
 
-/* Increase button size within bulk-actions to make them more prominent */
 .bulk-actions .btn {
   padding: 0.6rem 0.9rem;
   font-size: 0.95rem;
 }
 
-/* Make small buttons in bulk-actions slightly larger than global small buttons */
 .bulk-actions .btn-small {
   padding: 0.55rem 0.9rem;
   font-size: 0.92rem;
@@ -195,7 +188,6 @@
 }
 
 .file-count {
-  margin-left: 1rem;
   color: #666;
   font-size: 0.9rem;
 }
@@ -204,6 +196,110 @@
   opacity: 0.6;
   cursor: not-allowed;
   pointer-events: none;
+}
+
+/* Card with flexbox for scroll container */
+.card {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollable File List Container */
+.file-list-container {
+  max-height: calc(100vh - 280px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Search Dropdown Styles */
+.search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 0.5rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  max-height: 400px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.search-dropdown-header {
+  padding: 0.75rem 1rem;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.search-dropdown-items {
+  overflow-y: auto;
+  max-height: 320px;
+}
+
+.search-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.search-dropdown-item:hover {
+  background: #f9fafb;
+}
+
+.search-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.search-item-icon {
+  color: #667eea;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.search-item-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.search-item-name {
+  font-size: 0.9rem;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.25rem;
+}
+
+.search-item-path {
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.search-item-meta {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.search-dropdown-footer {
+  padding: 0.75rem 1rem;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.85rem;
+  color: #6b7280;
+  text-align: center;
 }
 
 @media (max-width: 768px) {
@@ -234,12 +330,15 @@
     margin-left: 0;
     margin-top: 0.5rem;
     min-width: 0;
-    /* allow wrapping on small screens */
     justify-content: flex-start;
   }
 
   .pagination {
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .file-list-container {
+    max-height: calc(100vh - 450px);
   }
 }

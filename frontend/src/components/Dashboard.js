@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaFolder, FaPlus, FaSearch } from 'react-icons/fa';
+import { FaFolder, FaPlus, FaSearch, FaFile, FaUser } from 'react-icons/fa';
 import { fileAPI, folderAPI } from '../services/api';
 import FileUpload from './FileUpload';
 import FileList from './FileList';
@@ -12,6 +12,7 @@ function Dashboard({ user, onLogout }) {
   const isAdmin = user && user.role === 'ROLE_ADMIN';
   const [files, setFiles] = useState([]);
   const [folders, setFolders] = useState([]);
+  const [allFolders, setAllFolders] = useState([]); // All folders for dropdown
   const [currentFolderId, setCurrentFolderId] = useState(null);
   const [breadcrumb, setBreadcrumb] = useState([]);
   const [storageInfo, setStorageInfo] = useState(null);
@@ -27,7 +28,11 @@ function Dashboard({ user, onLogout }) {
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [selectedTargetFolder, setSelectedTargetFolder] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const loadDataRef = useRef(false); // Prevent duplicate calls
+  const searchBoxRef = useRef(null); // Reference for search box
 
   useEffect(() => {
     // Skip if already loading
@@ -41,6 +46,63 @@ function Dashboard({ user, onLogout }) {
       loadDataRef.current = false;
     });
   }, [currentFolderId, currentPage]);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      // If search is cleared, reload normal data and hide dropdown
+      setShowSearchDropdown(false);
+      setSearchSuggestions([]);
+      loadData();
+      return;
+    }
+
+    // Set up debounce timer
+    const debounceTimer = setTimeout(async () => {
+      try {
+        // Search both files and folders
+        const [filesResponse, foldersResponse] = await Promise.all([
+          fileAPI.search(searchQuery),
+          folderAPI.getTree() // Get all folders from tree
+        ]);
+
+        const filesResults = filesResponse.data.files || [];
+        const allFolders = flattenFolders(foldersResponse.data.tree || []);
+
+        // Filter folders by search query
+        const foldersResults = allFolders.filter(folder =>
+          folder.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        // Combine results with type identifier
+        const combinedResults = [
+          ...foldersResults.map(f => ({ ...f, type: 'folder' })),
+          ...filesResults.map(f => ({ ...f, type: 'file' }))
+        ];
+
+        setSearchSuggestions(combinedResults);
+        setShowSearchDropdown(true);
+      } catch (err) {
+        console.error('Search failed:', err);
+        setSearchSuggestions([]);
+      }
+    }, 500);
+
+    // Cleanup function to clear timer
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(event.target)) {
+        setShowSearchDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadData = async () => {
     const callId = Math.random().toString(36).substring(7);
@@ -64,9 +126,16 @@ function Dashboard({ user, onLogout }) {
       setTotalPages(filesRes.data.totalPages || 0);
       setTotalItems(filesRes.data.totalItems || 0);
 
+      // Use folderList from current directory for display
+      // Use tree for dropdown options in move/rename
       const folderList = foldersRes.data.folders || [];
-      const flatFolders = flattenFolders(allFoldersRes.data.tree || []);
-      setFolders(flatFolders.length > 0 ? flatFolders : folderList);
+      const allFoldersTree = flattenFolders(allFoldersRes.data.tree || []);
+
+      // Store current directory folders for display
+      setFolders(folderList);
+      // Store all folders for dropdown in move/rename operations
+      setAllFolders(allFoldersTree);
+
       setBreadcrumb(breadcrumbRes.data.breadcrumb || []);
       setStorageInfo(storageRes.data);
 
@@ -78,11 +147,20 @@ function Dashboard({ user, onLogout }) {
     }
   };
 
-  const flattenFolders = (tree, result = []) => {
+  const flattenFolders = (tree, result = [], parentPath = '') => {
     tree.forEach(folder => {
-      result.push(folder);
+      // Build full path for this folder
+      const currentPath = parentPath ? `${parentPath}/${folder.name}` : folder.name;
+
+      // Add folder with fullPath
+      result.push({
+        ...folder,
+        fullPath: parentPath || null // Parent path (not including current folder name)
+      });
+
+      // Recursively flatten children with current path as parent
       if (folder.children && folder.children.length > 0) {
-        flattenFolders(folder.children, result);
+        flattenFolders(folder.children, result, currentPath);
       }
     });
     return result;
@@ -110,8 +188,30 @@ function Dashboard({ user, onLogout }) {
     try {
       const response = await fileAPI.search(searchQuery);
       setFiles(response.data.files || []);
+      setShowSearchDropdown(false); // Close dropdown after full search
     } catch (err) {
       alert('Search failed');
+    }
+  };
+
+  const handleSearchResultClick = (item) => {
+    // Close dropdown
+    setShowSearchDropdown(false);
+    setSearchQuery('');
+
+    if (item.type === 'folder') {
+      // Navigate to folder
+      handleNavigate(item.id);
+    } else {
+      // For files, navigate to folder and highlight the file
+      if (item.folderId) {
+        setCurrentFolderId(item.folderId);
+        setCurrentPage(0);
+        // Optionally select the file
+        setTimeout(() => {
+          setSelectedFiles([item.id]);
+        }, 500);
+      }
     }
   };
 
@@ -156,6 +256,7 @@ function Dashboard({ user, onLogout }) {
   const handleBulkDownload = async () => {
     if (selectedFiles.length === 0) return;
 
+    setIsDownloading(true);
     try {
       const response = await fileAPI.bulkDownload(selectedFiles);
       // Create download link
@@ -169,6 +270,8 @@ function Dashboard({ user, onLogout }) {
       setSelectedFiles([]);
     } catch (err) {
       alert('Failed to download files');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -244,6 +347,7 @@ function Dashboard({ user, onLogout }) {
       <header className="header">
         <div className="header-content">
           <h1>☁️ Cloud Storage</h1>
+          <span style={{ textAlign: 'center', marginLeft: '180px' }}><FaUser style={{ marginRight: '5px' }} />{user.username}</span>
           <div className="header-user">
             {storageInfo && (
               <div className="storage-info">
@@ -260,7 +364,6 @@ function Dashboard({ user, onLogout }) {
                 </span>
               </div>
             )}
-            <span>{user.username}</span>
             <button className="btn btn-secondary btn-small" onClick={onLogout}>
               Logout
             </button>
@@ -270,88 +373,89 @@ function Dashboard({ user, onLogout }) {
 
       {/* Main Content */}
       <div className="container">
-        {/* Breadcrumb with Back Button */}
-        <div className="breadcrumb">
-          <button className="btn btn-secondary btn-small" onClick={handleGoBack}>
-            ← Back
-          </button>
-          {breadcrumb.map((item, index) => (
-            <React.Fragment key={index}>
-              <button
-                className="breadcrumb-item"
-                onClick={() => handleNavigate(item.id)}
-              >
-                {item.name}
-              </button>
-              {index < breadcrumb.length - 1 && <span> / </span>}
-            </React.Fragment>
-          ))}
-        </div>
-
-        {/* Toolbar */}
+        {/* Breadcrumb with Search */}
         <div className="toolbar">
-          <div className="toolbar-left">
-            <button
-              className="btn btn-primary"
-              onClick={() => setShowCreateFolder(true)}
-            >
-              <FaPlus /> New Folder
+          <div className="breadcrumb">
+            <button className="btn btn-secondary btn-small" onClick={handleGoBack}>
+              ← Back
             </button>
-          </div>
-
-          {selectedFiles.length > 0 && (
-            <div className="bulk-actions">
-              <span>{selectedFiles.length} selected</span>
-              <button className="btn btn-success btn-small" onClick={handleBulkDownload}>
-                Download ({selectedFiles.length})
-              </button>
-              <button className="btn btn-move btn-small" onClick={() => setShowFolderPicker(true)}>
-                Move
-              </button>
-              <button
-                className="btn btn-danger btn-small"
-                onClick={handleBulkDelete}
-                disabled={isDeleting}
-              >
-                {isDeleting ? 'Deleting...' : `Delete (${selectedFiles.length})`}
-              </button>
-              <button className="btn btn-secondary btn-small" onClick={deselectAll}>
-                Clear
-              </button>
-            </div>
-          )}
-
-          <div className="toolbar-right">
-            <div className="search-box">
-              <input
-                type="text"
-                placeholder="Search files..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              />
-              <button onClick={handleSearch}>
-                <FaSearch />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Folders */}
-        {folders.length > 0 && !searchQuery && (
-          <div className="folders-grid">
-            {folders.map((folder) => (
-              <div
-                key={folder.id}
-                className="folder-card"
-                onClick={() => handleNavigate(folder.id)}
-              >
-                <FaFolder className="folder-icon" />
-                <span>{folder.name}</span>
-              </div>
+            {breadcrumb.map((item, index) => (
+              <React.Fragment key={index}>
+                <button
+                  className="breadcrumb-item"
+                  onClick={() => handleNavigate(item.id)}
+                >
+                  {item.name}
+                </button>
+                {index < breadcrumb.length - 1 && <span> / </span>}
+              </React.Fragment>
             ))}
           </div>
-        )}
+
+          <div className="toolbar-right">
+            <div className="search-box" ref={searchBoxRef} style={{ position: 'relative', width: '400px' }}>
+              <input
+                type="text"
+                placeholder="Search files and folders..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => searchSuggestions.length > 0 && setShowSearchDropdown(true)}
+              />
+              <button onClick={handleSearch} title="Search now">
+                <FaSearch />
+              </button>
+
+              {/* Search Dropdown */}
+              {showSearchDropdown && searchSuggestions.length > 0 && (
+                <div className="search-dropdown">
+                  <div className="search-dropdown-header">
+                    {searchSuggestions.length} result{searchSuggestions.length !== 1 ? 's' : ''} found
+                  </div>
+                  <div className="search-dropdown-items">
+                    {searchSuggestions.slice(0, 8).map((item) => (
+                      <div
+                        key={`${item.type}-${item.id}`}
+                        className="search-dropdown-item"
+                        onClick={() => handleSearchResultClick(item)}
+                      >
+                        {item.type === 'folder' ? (
+                          <FaFolder className="search-item-icon" style={{ color: '#667EEA' }} />
+                        ) : (
+                          <FaFile className="search-item-icon" />
+                        )}
+                        <div className="search-item-info">
+                          <div className="search-item-name">
+                            {item.type === 'folder' ? (
+                              <>
+                                {item.fullPath && <span className="search-item-path">{item.fullPath}/</span>}
+                                {item.name}
+                              </>
+                            ) : (
+                              <>
+                                {item.folderPath && <span className="search-item-path">{item.folderPath}/</span>}
+                                {item.fileName}
+                              </>
+                            )}
+                          </div>
+                          {item.type === 'file' && (
+                            <div className="search-item-meta">
+                              {(item.fileSize / 1024).toFixed(2)} KB • {new Date(item.uploadedAt).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {searchSuggestions.length > 8 && (
+                    <div className="search-dropdown-footer">
+                      Press Enter to see all {searchSuggestions.length} results
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Upload */}
         <FileUpload
@@ -362,8 +466,35 @@ function Dashboard({ user, onLogout }) {
         {/* Files */}
         <div className="card">
           <div className="card-header">
-            <div className="card-header-left">All Files</div>
+            <div className="card-header-left">
+              <span>Your Storage</span>
+              <button
+                className="btn btn-primary btn-small"
+                onClick={() => setShowCreateFolder(true)}
+                style={{ marginLeft: '1rem' }}
+              >
+                <FaPlus /> New Folder
+              </button>
+            </div>
             <div className="card-header-right">
+              {selectedFiles.length > 0 && (
+                <div className="bulk-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span>{selectedFiles.length} selected</span>
+                  <button style={{ backgroundColor: '#667EEA' }} className="btn btn-success btn-small" onClick={handleBulkDownload}>
+                    Download
+                  </button>
+                  <button style={{ backgroundColor: '#667EEA' }} className="btn btn-move btn-small" onClick={() => setShowFolderPicker(true)}>
+                    Move
+                  </button>
+                  <button style={{ backgroundColor: '#667EEA' }} className="btn btn-danger btn-small" onClick={handleBulkDelete} disabled={isDeleting}>
+                    {isDeleting ? 'Deleting...' : `Delete`}
+                  </button>
+                  <button className="btn btn-secondary btn-small" onClick={deselectAll}>
+                    Clear
+                  </button>
+                </div>
+              )}
+
               {files.length > 0 && (
                 <>
                   <button className="btn btn-secondary btn-small" onClick={selectAll}>
@@ -376,17 +507,25 @@ function Dashboard({ user, onLogout }) {
                   )}
                 </>
               )}
+
               <span className="file-count">({totalItems} total)</span>
             </div>
           </div>
-          <FileList
-            files={files}
-            folders={folders}
-            selectedFiles={selectedFiles}
-            onToggleSelection={toggleFileSelection}
-            onFileDeleted={loadData}
-            onFileUpdated={loadData}
-          />
+
+          {/* Scrollable File List Container */}
+          <div className="file-list-container">
+            <FileList
+              files={files}
+              folders={folders}
+              allFolders={allFolders}
+              selectedFiles={selectedFiles}
+              onToggleSelection={toggleFileSelection}
+              onFileDeleted={loadData}
+              onFileUpdated={loadData}
+              onFolderDeleted={loadData}
+              onNavigateToFolder={handleNavigate}
+            />
+          </div>
         </div>
 
         {/* Pagination */}
@@ -414,81 +553,121 @@ function Dashboard({ user, onLogout }) {
       </div>
 
       {/* Create Folder Modal */}
-      {showCreateFolder && (
-        <div className="modal-overlay" onClick={() => setShowCreateFolder(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Create New Folder</h3>
-              <button className="modal-close" onClick={() => setShowCreateFolder(false)}>×</button>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Folder Name:</label>
-              <input
-                type="text"
-                className="form-input"
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="Enter folder name"
-                autoFocus
-                onKeyPress={(e) => e.key === 'Enter' && handleCreateFolder()}
-              />
-            </div>
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowCreateFolder(false)}>
-                Cancel
-              </button>
-              <button className="btn btn-primary" onClick={handleCreateFolder}>
-                Create
-              </button>
+      {
+        showCreateFolder && (
+          <div className="modal-overlay" onClick={() => setShowCreateFolder(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3 className="modal-title">Create New Folder</h3>
+                <button className="modal-close" onClick={() => setShowCreateFolder(false)}>×</button>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Folder Name:</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="Enter folder name"
+                  autoFocus
+                  onKeyPress={(e) => e.key === 'Enter' && handleCreateFolder()}
+                />
+              </div>
+              <div className="modal-actions">
+                <button className="btn btn-secondary" onClick={() => setShowCreateFolder(false)}>
+                  Cancel
+                </button>
+                <button className="btn btn-primary" onClick={handleCreateFolder}>
+                  Create
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Folder Picker Modal for Bulk Move */}
-      {showFolderPicker && (
-        <div className="modal-overlay" onClick={() => setShowFolderPicker(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Select Destination Folder</h3>
-              <button className="modal-close" onClick={() => setShowFolderPicker(false)}>×</button>
+      {
+        showFolderPicker && (
+          <div className="modal-overlay" onClick={() => setShowFolderPicker(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3 className="modal-title">Select Destination Folder</h3>
+                <button className="modal-close" onClick={() => setShowFolderPicker(false)}>×</button>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Choose folder:</label>
+                <select
+                  className="form-input"
+                  value={selectedTargetFolder || ''}
+                  onChange={(e) => setSelectedTargetFolder(e.target.value || null)}
+                >
+                  <option value="">📁 Root (My Files)</option>
+                  {folders.map((folder) => (
+                    <option key={folder.id} value={folder.id}>
+                      📁 {folder.name} {folder.fullPath ? `(${folder.fullPath})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="modal-actions">
+                <button className="btn btn-secondary" onClick={() => {
+                  setShowFolderPicker(false);
+                  setSelectedTargetFolder(null);
+                }}>
+                  Cancel
+                </button>
+                <button className="btn btn-move" onClick={() => {
+                  handleBulkMove(selectedTargetFolder);
+                  setShowFolderPicker(false);
+                  setSelectedTargetFolder(null);
+                }}>
+                  Move Here
+                </button>
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Choose folder:</label>
-              <select
-                className="form-input"
-                value={selectedTargetFolder || ''}
-                onChange={(e) => setSelectedTargetFolder(e.target.value || null)}
-              >
-                <option value="">📁 Root (My Files)</option>
-                {folders.map((folder) => (
-                  <option key={folder.id} value={folder.id}>
-                    📁 {folder.name} {folder.fullPath ? `(${folder.fullPath})` : ''}
-                  </option>
-                ))}
-              </select>
+          </div>
+        )
+      }
+
+      {/* Downloading Toast Notification */}
+      {isDownloading && (
+        <div style={{
+          position: 'fixed',
+          bottom: '2rem',
+          right: '2rem',
+          background: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          padding: '1.25rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          zIndex: 1000,
+          minWidth: '320px',
+          animation: 'slideInRight 0.3s ease-out'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid #f3f4f6',
+            borderTop: '3px solid #667eea',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            flexShrink: 0
+          }}></div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: '0.25rem' }}>
+              Preparing Download
             </div>
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => {
-                setShowFolderPicker(false);
-                setSelectedTargetFolder(null);
-              }}>
-                Cancel
-              </button>
-              <button className="btn btn-move" onClick={() => {
-                handleBulkMove(selectedTargetFolder);
-                setShowFolderPicker(false);
-                setSelectedTargetFolder(null);
-              }}>
-                Move Here
-              </button>
+            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+              Compressing {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}...
             </div>
           </div>
         </div>
       )}
-    </div>
+    </div >
   );
 }
 
 export default Dashboard;
-

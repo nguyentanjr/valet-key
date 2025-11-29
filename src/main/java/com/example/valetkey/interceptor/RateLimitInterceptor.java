@@ -29,23 +29,18 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         String requestUri = request.getRequestURI();
         String method = request.getMethod();
 
-        // Determine rate limit type based on endpoint
         RateLimitService.RateLimitType limitType = determineRateLimitType(requestUri, method);
         
         if (limitType == null) {
-            // No rate limit for this endpoint
             return true;
         }
 
-        // Generate rate limit key
         String key = generateRateLimitKey(request, requestUri, limitType);
         
         if (key == null) {
-            // Cannot determine key, allow request
             return true;
         }
 
-        // Check rate limit
         boolean allowed = rateLimitService.tryConsume(key, limitType);
         
         if (!allowed) {
@@ -53,7 +48,6 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // Add rate limit headers
         addRateLimitHeaders(response, key, limitType);
         
         return true;
@@ -63,71 +57,57 @@ public class RateLimitInterceptor implements HandlerInterceptor {
      * Determine rate limit type based on request URI and method
      */
     private RateLimitService.RateLimitType determineRateLimitType(String uri, String method) {
-        // Authentication
+
         if (uri.equals("/login") && method.equals("POST")) {
             return RateLimitService.RateLimitType.LOGIN;
         }
 
-        // Direct Azure Upload - Generate SAS URL
-        // Rate limit: Prevent abuse of SAS URL generation
         if (uri.equals("/api/files/upload/sas-url") && method.equals("POST")) {
             return RateLimitService.RateLimitType.UPLOAD_SMALL;
         }
 
-        // Direct Azure Upload - Confirm Upload
-        // Rate limit: Prevent abuse of confirm endpoint
+
         if (uri.equals("/api/files/upload/confirm") && method.equals("POST")) {
             return RateLimitService.RateLimitType.UPLOAD_SMALL;
         }
 
-        // Bulk Operations
         if (uri.startsWith("/api/files/bulk-") && method.equals("POST")) {
             return RateLimitService.RateLimitType.BULK_OPERATION;
         }
 
-        // Download
         if (uri.matches("/api/files/\\d+/download") && method.equals("GET")) {
             return RateLimitService.RateLimitType.DOWNLOAD;
         }
 
-        // Public Access
         if (uri.startsWith("/api/public/files/") && method.equals("GET")) {
             return RateLimitService.RateLimitType.PUBLIC_ACCESS_IP;
         }
 
-        // Search
         if (uri.equals("/api/files/search") && method.equals("GET")) {
             return RateLimitService.RateLimitType.SEARCH;
         }
 
-        // List Files
         if (uri.equals("/api/files/list") && method.equals("GET")) {
             return RateLimitService.RateLimitType.LIST_FILES;
         }
 
-        // No rate limit for other endpoints
         return null;
     }
 
-    /**
-     * Generate rate limit key based on request context
-     */
+
     private String generateRateLimitKey(HttpServletRequest request, String uri, 
                                        RateLimitService.RateLimitType limitType) {
         
-        // For login, use IP address
         if (limitType == RateLimitService.RateLimitType.LOGIN) {
             String ipAddress = getClientIpAddress(request);
             return rateLimitService.generateIpKey(ipAddress, limitType);
         }
 
-        // For public access, use IP address
         if (limitType == RateLimitService.RateLimitType.PUBLIC_ACCESS_IP) {
             String ipAddress = getClientIpAddress(request);
             return rateLimitService.generateIpKey(ipAddress, limitType);
         }
 
-        // For authenticated endpoints, use user ID
         HttpSession session = request.getSession(false);
         if (session != null) {
             User user = (User) session.getAttribute("user");

@@ -33,7 +33,7 @@ public class RateLimitService {
 
     public enum RateLimitType {
 
-        LOGIN(5, Duration.ofMinutes(15)),
+        LOGIN(7, Duration.ofMinutes(1)),
 
         UPLOAD_SMALL(20, Duration.ofMinutes(1)),
         
@@ -85,10 +85,7 @@ public class RateLimitService {
     }
 
 
-    /**
-     * Resolve or create bucket from Redis
-     * Buckets are stored in Redis and shared across all instances
-     */
+
     public Bucket resolveBucket(String key, RateLimitType type) {
         // Create bucket configuration supplier
         Supplier<BucketConfiguration> configurationSupplier = () -> {
@@ -107,10 +104,7 @@ public class RateLimitService {
             .build(key, configurationSupplier);
     }
 
-    /**
-     * Try to consume tokens from bucket
-     * @return true if request is allowed, false if rate limited
-     */
+
     public boolean tryConsume(String key, RateLimitType type) {
         Bucket bucket = resolveBucket(key, type);
         boolean consumed = bucket.tryConsume(1);
@@ -122,42 +116,30 @@ public class RateLimitService {
         return consumed;
     }
 
-    /**
-     * Get remaining tokens for a key
-     */
+
     public long getAvailableTokens(String key, RateLimitType type) {
         Bucket bucket = resolveBucket(key, type);
         return bucket.getAvailableTokens();
     }
 
-    /**
-     * Generate rate limit key based on user ID
-     */
+
     public String generateUserKey(Long userId, RateLimitType type) {
         return String.format("user:%d:%s", userId, type.name());
     }
 
-    /**
-     * Generate rate limit key based on IP address
-     */
+
     public String generateIpKey(String ipAddress, RateLimitType type) {
         return String.format("ip:%s:%s", ipAddress, type.name());
     }
 
-    /**
-     * Generate rate limit key based on token
-     */
+
     public String generateTokenKey(String token, RateLimitType type) {
         return String.format("token:%s:%s", token, type.name());
     }
 
-    /**
-     * Clear bucket for a specific key (for testing or admin purposes)
-     * The key should be the full key (e.g., "user:1:UPLOAD_SMALL")
-     */
+
     public void clearBucket(String key, RateLimitType type) {
-        // Key already contains type (e.g., "user:1:UPLOAD_SMALL")
-        // So we use it directly
+
         try {
             log.info("Bucket clear requested for key: {} (type: {})", key, type);
             // Delete the key from Redis
@@ -167,11 +149,7 @@ public class RateLimitService {
         }
     }
 
-    /**
-     * Clear all rate limit buckets (for testing or admin purposes)
-     * This will delete all keys matching the bucket pattern from Redis
-     * Pattern: user:*, ip:*, token:*
-     */
+
     public void clearAllBuckets() {
         try {
             int deletedCount = 0;
@@ -197,9 +175,7 @@ public class RateLimitService {
         }
     }
 
-    /**
-     * Get bucket statistics
-     */
+
     public Map<String, Long> getBucketStats(String key, RateLimitType type) {
         Bucket bucket = resolveBucket(key, type);
         return Map.of(

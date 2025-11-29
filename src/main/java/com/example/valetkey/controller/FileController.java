@@ -74,7 +74,7 @@ public class FileController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Not authenticated"));
             }
-            
+
             String fileName = (String) request.get("fileName");
             Long fileSize = Long.parseLong(request.get("fileSize").toString());
             Long folderId = request.get("folderId") != null 
@@ -87,7 +87,8 @@ public class FileController {
             Map<String, String> result = fileService.generateUploadSasUrl(
                 fileName, fileSize, user, folderId, expiryMinutes
             );
-
+            String hostname = System.getenv("HOSTNAME");
+            log.info(" [BACKEND: {}] GET /api/upload/sas-url", hostname);
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {
@@ -128,7 +129,8 @@ public class FileController {
             Map<String, Object> result = fileService.generateBatchUploadSasUrls(
                 files, user, folderId, expiryMinutes
             );
-
+            String hostname = System.getenv("HOSTNAME");
+            log.info("[BACKEND: {}] GET /api/upload/batch", hostname);
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {
@@ -169,7 +171,8 @@ public class FileController {
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Upload confirmed successfully");
             response.put("file", fileToMap(resource));
-
+            String hostname = System.getenv("HOSTNAME");
+            log.info(" [BACKEND: {}] GET /api/upload/confirm", hostname);
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {

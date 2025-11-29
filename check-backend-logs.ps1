@@ -15,3 +15,6 @@ Write-Host "💡 Nếu không thấy logs, có thể backend chưa được rebu
 Write-Host "   Chạy: mvn clean package -DskipTests" -ForegroundColor Green
 Write-Host "   Sau đó: docker-compose restart backend1 backend2" -ForegroundColor Green
 
+
+
+

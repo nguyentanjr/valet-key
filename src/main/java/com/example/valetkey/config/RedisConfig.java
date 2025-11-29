@@ -56,7 +56,6 @@ public class RedisConfig {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
         
-        // Configure ObjectMapper với JavaTimeModule để hỗ trợ LocalDateTime
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -76,20 +75,16 @@ public class RedisConfig {
         return new org.springframework.data.redis.serializer.JdkSerializationRedisSerializer();
     }
 
-    /**
-     * Configure CookieSerializer để Spring Session quản lý cookie đúng cách.
-     * Dùng DefaultCookieSerializer (đã được Spring test kỹ) thay vì custom implementation.
-     * DefaultCookieSerializer sẽ tự động handle encoding/decoding cookie value.
-     */
+
     @Bean
     public CookieSerializer cookieSerializer() {
         DefaultCookieSerializer serializer = new DefaultCookieSerializer();
         serializer.setCookieName("SESSION");
         serializer.setCookiePath("/");
-        serializer.setUseHttpOnlyCookie(false); // Từ application.properties
-        serializer.setUseSecureCookie(false);   // Từ application.properties
-        serializer.setSameSite("Lax");          // Từ application.properties
-        serializer.setCookieMaxAge(1800);       // 30 minutes
+        serializer.setUseHttpOnlyCookie(false);
+        serializer.setUseSecureCookie(false);
+        serializer.setSameSite("Lax");
+        serializer.setCookieMaxAge(1800);
         return serializer;
     }
 

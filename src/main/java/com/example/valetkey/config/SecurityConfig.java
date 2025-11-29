@@ -65,9 +65,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
         
-        // Configure SecurityContextRepository to persist authentication in session
-        // HttpSessionSecurityContextRepository sẽ tự động save SecurityContext vào session
-        // và Spring Session sẽ serialize nó vào Redis
+
         SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
         
         http

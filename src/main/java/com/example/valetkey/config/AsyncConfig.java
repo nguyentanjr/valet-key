@@ -21,10 +21,7 @@ public class AsyncConfig {
         return executor;
     }
 
-    /**
-     * Custom executor for async file uploads
-     * Allows concurrent file uploads while limiting resource usage
-     */
+
     @Bean(name = "asyncUploadExecutor")
     public Executor asyncUploadExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();

@@ -39,9 +39,7 @@ public class FileService {
 
 
 
-    /**
-     * Get file by ID
-     */
+
     @Transactional(readOnly = true)
     public Resource getFile(Long fileId, User user) {
         Resource resource = resourceRepository.findById(fileId)
@@ -55,9 +53,7 @@ public class FileService {
         return resource;
     }
 
-    /**
-     * Get download URL for a file
-     */
+
     @Transactional(readOnly = true)
     public String getDownloadUrl(Long fileId, User user) throws InterruptedException {
         Resource resource = getFile(fileId, user);
@@ -71,9 +67,7 @@ public class FileService {
         return azureSasService.generateBlobReadSas(resource.getFilePath(), expiryMinutes, user);
     }
 
-    /**
-     * Delete a file
-     */
+
     @Transactional
     @Caching(evict = {
         @CacheEvict(value = "userStorage", key = "#user.id"),
@@ -92,9 +86,7 @@ public class FileService {
         log.info("File deleted: {} by user: {}", resource.getFileName(), user.getUsername());
     }
 
-    /**
-     * Get all files in a folder
-     */
+
     @Transactional(readOnly = true, timeout = 20)
     public List<Resource> getAllFiles(User user, Long folderId) {
         if (folderId == null) {
@@ -125,9 +117,7 @@ public class FileService {
         }
     }
 
-    /**
-     * List files in a folder (with pagination)
-     */
+
     @Transactional(readOnly = true)
     public Page<Resource> listFiles(User user, Long folderId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -147,18 +137,14 @@ public class FileService {
         }
     }
 
-    /**
-     * Search files by name
-     */
+
     @Transactional(readOnly = true)
     public Page<Resource> searchFiles(User user, String query, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         return resourceRepository.searchByUploaderAndFileName(user, query, pageable);
     }
 
-    /**
-     * Get file metadata
-     */
+
     @Transactional(readOnly = true)
     @Cacheable(value = "fileMetadata", key = "#fileId + '_' + #user.id")
     public Map<String, Object> getFileMetadata(Long fileId, User user) {
@@ -191,9 +177,7 @@ public class FileService {
         return metadata;
     }
 
-    /**
-     * Generate public sharing link
-     */
+
     @Transactional
     public String generatePublicLink(Long fileId, User user) {
         Resource resource = getFile(fileId, user);
@@ -206,9 +190,7 @@ public class FileService {
         return resource.getPublicLinkToken();
     }
 
-    /**
-     * Revoke public sharing link
-     */
+
     @Transactional
     public void revokePublicLink(Long fileId, User user) {
         Resource resource = getFile(fileId, user);
@@ -216,17 +198,13 @@ public class FileService {
         resourceRepository.save(resource);
     }
 
-    /**
-     * Get file by public link token
-     */
+
     public Resource getFileByPublicToken(String token) {
         return resourceRepository.findByPublicLinkToken(token)
             .orElseThrow(() -> new RuntimeException("Invalid or expired public link"));
     }
 
-    /**
-     * Get download URL for public file
-     */
+
     public String getPublicDownloadUrl(String token) throws InterruptedException {
         Resource resource = getFileByPublicToken(token);
         
@@ -238,9 +216,7 @@ public class FileService {
         return azureSasService.generateBlobReadSas(resource.getFilePath(), expiryMinutes, tempUser);
     }
 
-    /**
-     * Get user storage info
-     */
+
     @Transactional(readOnly = true)
     @Cacheable(value = "userStorage", key = "#user.id")
     public Map<String, Object> getUserStorageInfo(User user) {
@@ -265,9 +241,7 @@ public class FileService {
         return storageInfo;
     }
 
-    /**
-     * Move file to another folder
-     */
+
     @Transactional
     public Resource moveFile(Long fileId, Long targetFolderId, User user) {
         Resource resource = getFile(fileId, user);
@@ -286,9 +260,7 @@ public class FileService {
         return resourceRepository.save(resource);
     }
 
-    /**
-     * Rename a file
-     */
+
     @Transactional
     public Resource renameFile(Long fileId, String newName, User user) {
         Resource resource = getFile(fileId, user);
@@ -302,9 +274,7 @@ public class FileService {
     }
 
 
-    /**
-     * Bulk delete files
-     */
+
     @Transactional
     public void bulkDeleteFiles(List<Long> fileIds, User user) {
         List<Resource> resources = resourceRepository.findByIdsAndUploader(fileIds, user);
@@ -329,9 +299,7 @@ public class FileService {
         log.info("Bulk deleted {} files by user: {}", resources.size(), user.getUsername());
     }
 
-    /**
-     * Bulk move files
-     */
+
     @Transactional
     public void bulkMoveFiles(List<Long> fileIds, Long targetFolderId, User user) {
         Folder targetFolder = null;
@@ -354,9 +322,7 @@ public class FileService {
         log.info("Bulk moved {} files by user: {}", resources.size(), user.getUsername());
     }
 
-    /**
-     * Get file by ID
-     */
+
     public Resource getFileIncludingDeleted(Long fileId, User user) {
         return resourceRepository.findByIdAndUploader(fileId, user)
             .orElseThrow(() -> new RuntimeException("File not found"));
@@ -364,9 +330,7 @@ public class FileService {
 
     // Helper methods
 
-    /**
-     * Generate SAS URL for direct Azure upload (single file)
-     */
+
     @Transactional(readOnly = true)
     public Map<String, String> generateUploadSasUrl(String fileName, Long fileSize, User user, Long folderId, int expiryMinutes) {
         // Check permissions
@@ -410,9 +374,7 @@ public class FileService {
         return result;
     }
 
-    /**
-     * Generate SAS URLs for batch upload
-     */
+
     @Transactional(readOnly = true)
     public Map<String, Object> generateBatchUploadSasUrls(List<Map<String, Object>> fileInfos, User user, Long folderId, int expiryMinutes) {
         // Check permissions
@@ -481,10 +443,7 @@ public class FileService {
         return result;
     }
 
-    /**
-     * Confirm direct upload after file has been uploaded to Azure
 
-     */
     @Transactional
     @Caching(evict = {
         @CacheEvict(value = "fileList", allEntries = true),

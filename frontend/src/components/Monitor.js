@@ -20,6 +20,8 @@ function Monitor({ onBack }) {
     const [cacheStats, setCacheStats] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [retries, setRetries] = useState({});
+
 
     // Rate Limit State (Global or Local tùy thiết kế, ở đây giả sử check qua Load Balancer)
     const [searchUserId, setSearchUserId] = useState('6');
@@ -49,6 +51,7 @@ function Monitor({ onBack }) {
                 monitoringAPI.getNodeHealth(activeNode.url),      // Check Health
                 monitoringAPI.getCircuitBreakers(activeNode.url), // Check CB
                 monitoringAPI.getCacheStats(activeNode.url),      // Check Cache
+                monitoringAPI.getRetries(activeNode.url),        // Check Retries 
             ]);
 
             // Xử lý Health
@@ -70,6 +73,13 @@ function Monitor({ onBack }) {
                 setCacheStats(safeMapData(results[2].value.data));
             } else {
                 setCacheStats([]);
+            }
+
+            // RETRIES
+            if (results[3].status === 'fulfilled') {
+                setRetries(results[3].value.data || {});
+            } else {
+                setRetries({});
             }
 
         } catch (globalError) {
@@ -151,7 +161,7 @@ function Monitor({ onBack }) {
         const failRate = cb.failureRate !== -1 ? cb.failureRate?.toFixed(1) + '%' : 'Calculating...';
 
         return (
-            <div className="col-span-4" key={cb.name}>
+            <div className="col-span-6" key={cb.name}>
                 <div className={`card ${stateClass}`}>
                     <div className="card-body">
                         <div className="d-flex justify-between align-center mb-3">
@@ -206,6 +216,50 @@ function Monitor({ onBack }) {
         );
     };
 
+    const renderRetriesCard = (name, info) => {
+        return (
+            <div className="col-span-6" key={name}>
+                <div className="card cb-closed">
+                    <div className="card-body">
+
+                        <div className="d-flex justify-between align-center mb-3">
+                            <h5 style={{ margin: 0, fontSize: "1rem" }}>{name}</h5>
+                            <span className="badge bg-primary">Retries</span>
+                        </div>
+
+                        <div style={{ borderBottom: "1px solid #eee", margin: "10px 0" }} />
+
+                        <div className="d-flex justify-between text-center mb-3">
+                            <div style={{ flex: 1 }} className="border-end">
+                                <small className="text-muted">Success (no retry)</small>
+                                <div className="fw-bold text-success" style={{ fontSize: "1.2rem" }}>
+                                    {info.numberOfSuccessfulCallsWithoutRetryAttempt}
+                                </div>
+                            </div>
+
+                            <div style={{ flex: 1 }} className="border-end">
+                                <small className="text-muted">Success (with retry)</small>
+                                <div className="fw-bold text-primary" style={{ fontSize: "1.2rem" }}>
+                                    {info.numberOfSuccessfulCallsWithRetryAttempt}
+                                </div>
+                            </div>
+
+                            <div style={{ flex: 1 }}>
+                                <small className="text-muted">Failed (with retry)</small>
+                                <div className="fw-bold text-danger" style={{ fontSize: "1.2rem" }}>
+                                    {info.numberOfFailedCallsWithRetryAttempt}
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+
+
     return (
         <div className="monitor-full-page">
             <div className="monitor-wrapper">
@@ -217,17 +271,17 @@ function Monitor({ onBack }) {
                     </div>
                     <div className="monitor-header-actions">
                         {onBack && (
-                            <button className="btn btn-outline-secondary me-2" onClick={onBack}>
+                            <button style={{ background: '#6c63ff', color: 'white', border: 'none' }} className="btn btn-outline-secondary me-2" onClick={onBack}>
                                 ← Back
                             </button>
                         )}
-                        <button className="btn btn-outline-secondary me-2" onClick={loadMonitoringData} disabled={refreshing}>
+                        <button style={{ background: '#6c63ff', color: 'white', border: 'none' }} className="btn btn-outline-secondary me-2" onClick={loadMonitoringData} disabled={refreshing}>
                             <FaSync className={refreshing ? 'fa-spin' : ''} /> {refreshing ? 'Refreshing...' : 'Refresh Node'}
                         </button>
-                        <button className="btn btn-outline-warning me-2" onClick={handleClearAllRateLimits}>
+                        <button style={{ background: '#6c63ff', color: 'white', border: 'none' }} className="btn btn-outline-warning me-2" onClick={handleClearAllRateLimits}>
                             <FaBroom /> Global Limits Reset
                         </button>
-                        <button className="btn btn-outline-danger" onClick={handleClearAllCaches}>
+                        <button style={{ background: '#6c63ff', color: 'white', border: 'none' }} className="btn btn-outline-danger" onClick={handleClearAllCaches}>
                             <FaTrash /> Global Cache Clear
                         </button>
                     </div>
@@ -269,16 +323,35 @@ function Monitor({ onBack }) {
                             </div>
                         ) : (
                             <>
-                                {/* 1. CIRCUIT BREAKERS */}
                                 <h4 className="monitor-section-title">
-                                    <FaPlug /> Circuit Breakers <span className="text-muted small">({activeNode.name})</span>
+                                    <FaPlug /> Circuit Breakers & Retries
+                                    <span className="text-muted small">({activeNode.name})</span>
                                 </h4>
+
                                 <div className="dashboard-grid">
-                                    {circuitBreakers.length > 0 ?
-                                        circuitBreakers.map(renderCircuitBreakerCard) :
-                                        <div className="col-span-12"><div className="alert alert-info">No Circuit Breakers active on this node.</div></div>
-                                    }
+
+                                    {/* Circuit Breakers */}
+                                    {circuitBreakers.length > 0 ? (
+                                        circuitBreakers.map(renderCircuitBreakerCard)
+                                    ) : (
+                                        <div className="col-span-12">
+                                            <div className="alert alert-info">No Circuit Breakers active on this node.</div>
+                                        </div>
+                                    )}
+
+                                    {/* Retries */}
+                                    {retries && Object.keys(retries).length > 0 ? (
+                                        Object.entries(retries).map(([name, info]) =>
+                                            renderRetriesCard(name, info)
+                                        )
+                                    ) : (
+                                        <div className="col-span-12">
+                                            <div className="alert alert-info">No retry metrics found.</div>
+                                        </div>
+                                    )}
                                 </div>
+
+
 
                                 {/* 2. CACHE STATISTICS */}
                                 <h4 className="monitor-section-title">

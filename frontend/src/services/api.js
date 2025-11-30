@@ -272,6 +272,9 @@ export const monitoringAPI = {
   getNodeHealth: (nodeUrl) =>
     requestNode(nodeUrl, 'GET', '/api/admin/monitoring/health-summary'),
 
+  getRetries: (nodeUrl) =>
+    requestNode(nodeUrl, 'GET', '/api/admin/monitoring/retries'),
+
   // 2. CIRCUIT BREAKERS
   // Quan trọng: Phải nhận tham số nodeUrl để biết gọi vào backend nào
   getCircuitBreakers: (nodeUrl) =>

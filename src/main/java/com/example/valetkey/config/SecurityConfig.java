@@ -85,7 +85,7 @@ public class SecurityConfig {
                         .requestMatchers("/admin/**").hasRole("ADMIN") // Admin endpoints require ADMIN role
                         .requestMatchers("/login","/logout","/h2-console/**",
                                 "/user/list-blob/**","/user/upload-sas/**","/debug/**","/debug/session","/debug/role",
-                                "/api/public/**","/whoami/**").permitAll()
+                                "/api/public/**","/whoami/**","/actuator/").permitAll()
                         .requestMatchers("/user", "/api/**").authenticated() // User info and API endpoints require authentication
                         .anyRequest().authenticated() // All other endpoints require authentication
                 )

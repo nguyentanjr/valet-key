@@ -6,7 +6,6 @@
   --adm-bg-body: #f3f4f6;
   --adm-bg-card: #ffffff;
   --adm-text-main: #1f2937;
-  --adm-text-muted: #6b7280;
   --adm-border: #e5e7eb;
   --adm-success: #10b981;
   --adm-warning: #f59e0b;
@@ -74,7 +73,6 @@
   align-items: center;
   gap: 1rem;
   border: 1px solid transparent;
-  /* Tránh nhảy layout khi hover */
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
@@ -151,7 +149,6 @@
   padding: 1.5rem;
   border: 1px solid var(--adm-border);
   margin-bottom: 0;
-  /* Reset global margin nếu có */
 }
 
 .admin-scope-wrapper .card-header {
@@ -265,7 +262,6 @@
   gap: 0.5rem;
 }
 
-/* Chỉ style input nằm trong wrapper này */
 .admin-scope-wrapper input[type="number"],
 .admin-scope-wrapper input[type="text"] {
   border: 1px solid var(--adm-border);
@@ -276,7 +272,6 @@
   color: var(--adm-text-main);
   transition: border-color 0.2s;
   height: auto;
-  /* Reset height nếu global set */
   line-height: normal;
 }
 
@@ -396,7 +391,6 @@
   font-size: 0.8rem;
   color: var(--adm-text-muted);
   margin: 0;
-  /* Reset margin */
 }
 
 .admin-scope-wrapper .perm-checkbox:hover {
@@ -415,6 +409,22 @@
   gap: 1.5rem;
 }
 
+/* Action card - more compact */
+.admin-scope-wrapper .action-card {
+  padding: 1rem;
+  height: 200px;
+}
+
+.admin-scope-wrapper .action-card h3 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.admin-scope-wrapper .action-card p {
+  font-size: 0.75rem;
+  margin: 0 0 0.75rem 0;
+}
+
 .admin-scope-wrapper .input-group {
   display: flex;
   gap: 0.5rem;
@@ -430,6 +440,9 @@
   list-style: none;
   padding: 0;
   margin: 1rem 0 0;
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .admin-scope-wrapper .consumer-item {
@@ -461,7 +474,6 @@
 .admin-scope-wrapper .consumer-info {
   flex: 1;
   min-width: 0;
-  /* Giúp text truncate hoạt động nếu cần */
 }
 
 .admin-scope-wrapper .consumer-info strong {
@@ -521,4 +533,72 @@
 
 .admin-scope-wrapper .text-small {
   font-size: 0.8rem;
+}
+
+.admin-scope-wrapper .text-center {
+  text-align: center;
+}
+
+/* --- TAB NAVIGATION --- */
+.admin-scope-wrapper .tab-navigation {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0;
+}
+
+.admin-scope-wrapper .tab-btn {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--adm-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  margin-bottom: -2px;
+  position: relative;
+}
+
+.admin-scope-wrapper .tab-btn:hover {
+  color: var(--adm-text-main);
+  background-color: #f9fafb;
+}
+
+.admin-scope-wrapper .tab-btn.active {
+  color: var(--adm-primary);
+  border-bottom-color: var(--adm-primary);
+  font-weight: 600;
+}
+
+.admin-scope-wrapper .tab-btn svg {
+  font-size: 1.1rem;
+}
+
+/* Mobile responsive tabs */
+@media (max-width: 640px) {
+  .admin-scope-wrapper .tab-navigation {
+    flex-direction: column;
+    gap: 0;
+    border-bottom: none;
+  }
+
+  .admin-scope-wrapper .tab-btn {
+    width: 100%;
+    justify-content: flex-start;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 0;
+    padding: 1rem;
+  }
+
+  .admin-scope-wrapper .tab-btn.active {
+    background-color: #f0f9ff;
+    border-left: 3px solid var(--adm-primary);
+    border-bottom: 1px solid #e5e7eb;
+  }
 }

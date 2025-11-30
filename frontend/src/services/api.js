@@ -3,19 +3,19 @@ import axios from 'axios';
 // ✅ Trong development: dùng relative URL để đi qua React dev server proxy
 // ✅ Trong production: có thể dùng absolute URL nếu cần
 // React dev server proxy sẽ forward requests đến Nginx (port 80)
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-    ? 'http://localhost'  // Production: gọi trực tiếp đến Nginx
-    : '';                  // Development: dùng relative URL → đi qua setupProxy.js → Nginx
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? 'http://localhost'  // Production: gọi trực tiếp đến Nginx
+  : '';                  // Development: dùng relative URL → đi qua setupProxy.js → Nginx
 
 const api = axios.create({
-    baseURL: API_BASE_URL,
-    withCredentials: true,
-    headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-    },
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  },
 });
 
 
@@ -49,7 +49,7 @@ api.interceptors.response.use(
     // Check if this is a Circuit Breaker error
     if (error.response) {
       const { status, data } = error.response;
-      
+
       // 503 Service Unavailable or circuitBreakerOpen flag
       if (status === 503 || (data && data.circuitBreakerOpen)) {
         // Add circuit breaker flag to error for easy detection
@@ -57,7 +57,7 @@ api.interceptors.response.use(
         error.circuitBreakerMessage = data?.message || 'The system is temporarily overloaded. Please try again later.';
         error.retryAfter = data?.retryAfter || 60;
       }
-      
+
       // 401 Unauthorized - session might have expired or invalid
       // This can happen when load balancer routes to a different backend instance
       if (status === 401) {
@@ -65,20 +65,20 @@ api.interceptors.response.use(
         // Don't auto-redirect here, let components handle it
       }
     }
-    
+
     return Promise.reject(error);
   }
 );
 
 // Authentication
 export const authAPI = {
-  login: (username, password) => 
+  login: (username, password) =>
     api.post('/login', { username, password }),
-  
-  logout: () => 
+
+  logout: () =>
     api.post('/logout'),
-  
-  getCurrentUser: () => 
+
+  getCurrentUser: () =>
     api.get('/user'),
 };
 
@@ -109,53 +109,53 @@ export const fileAPI = {
       fileSize: file.size,
       contentType: file.type
     }));
-    
+
     return api.post('/api/files/upload/batch/sas-urls', {
       files: fileInfos,
       folderId,
       expiryMinutes
     });
   },
-  
+
   list: (folderId, page = 0, size = 20) => {
     const params = { page, size };
     if (folderId) params.folderId = folderId;
     return api.get('/api/files/list', { params });
   },
-  
+
   getAllIds: (folderId) => {
     const params = {};
     if (folderId) params.folderId = folderId;
     return api.get('/api/files/all-ids', { params });
   },
-  
-  get: (fileId) => 
+
+  get: (fileId) =>
     api.get(`/api/files/${fileId}`),
-  
-  getDownloadUrl: (fileId) => 
+
+  getDownloadUrl: (fileId) =>
     api.get(`/api/files/${fileId}/download`),
-  
-  delete: (fileId) => 
+
+  delete: (fileId) =>
     api.delete(`/api/files/${fileId}`),
-  
-  move: (fileId, targetFolderId) => 
+
+  move: (fileId, targetFolderId) =>
     api.put(`/api/files/${fileId}/move`, null, {
       params: { targetFolderId },
     }),
-  
-  rename: (fileId, newName) => 
+
+  rename: (fileId, newName) =>
     api.put(`/api/files/${fileId}/rename`, { newName }),
-  
-  search: (query, page = 0, size = 20) => 
+
+  search: (query, page = 0, size = 20) =>
     api.get('/api/files/search', { params: { query, page, size } }),
-  
-  generatePublicLink: (fileId) => 
+
+  generatePublicLink: (fileId) =>
     api.post(`/api/files/${fileId}/share`),
-  
-  revokePublicLink: (fileId) => 
+
+  revokePublicLink: (fileId) =>
     api.delete(`/api/files/${fileId}/share`),
-  
-  getStorageInfo: () => 
+
+  getStorageInfo: () =>
     api.get('/api/files/storage'),
 
   // Bulk operations
@@ -174,57 +174,57 @@ export const fileAPI = {
 
 // Folder Operations
 export const folderAPI = {
-  create: (folderName, parentFolderId) => 
+  create: (folderName, parentFolderId) =>
     api.post('/api/folders/create', { folderName, parentFolderId }),
-  
+
   list: (parentFolderId) => {
     const params = parentFolderId ? { parentFolderId } : {};
     return api.get('/api/folders/list', { params });
   },
-  
-  get: (folderId) => 
+
+  get: (folderId) =>
     api.get(`/api/folders/${folderId}`),
-  
-  getTree: () => 
+
+  getTree: () =>
     api.get('/api/folders/tree'),
-  
+
   getContents: (folderId, page = 0, size = 20) => {
-    const url = folderId 
+    const url = folderId
       ? `/api/folders/${folderId}/contents`
       : '/api/folders/root/contents';
     return api.get(url, { params: { page, size } });
   },
-  
-  delete: (folderId, deleteContents = false) => 
+
+  delete: (folderId, deleteContents = false) =>
     api.delete(`/api/folders/${folderId}`, {
       params: { deleteContents },
     }),
-  
-  rename: (folderId, newName) => 
+
+  rename: (folderId, newName) =>
     api.put(`/api/folders/${folderId}/rename`, { newName }),
-  
-  move: (folderId, targetParentFolderId) => 
+
+  move: (folderId, targetParentFolderId) =>
     api.put(`/api/folders/${folderId}/move`, null, {
       params: { targetParentFolderId },
     }),
-  
+
   getBreadcrumb: (folderId) => {
-    const url = folderId 
+    const url = folderId
       ? `/api/folders/${folderId}/breadcrumb`
       : '/api/folders/root/breadcrumb';
     return api.get(url);
   },
-  
-  search: (query) => 
+
+  search: (query) =>
     api.get('/api/folders/search', { params: { query } }),
 };
 
 // Public File Access (no auth)
 export const publicAPI = {
-  getFile: (token) => 
+  getFile: (token) =>
     api.get(`/api/public/files/${token}`),
-  
-  getDownloadUrl: (token) => 
+
+  getDownloadUrl: (token) =>
     api.get(`/api/public/files/${token}/download`),
 };
 
@@ -246,6 +246,66 @@ export const adminAPI = {
 
   getStats: (top = 5) =>
     api.get('/admin/stats', { params: { top } }),
+};
+
+export const BACKEND_NODES = [
+  { id: 'be1', name: 'Backend 01', url: 'http://localhost:8081' },
+  { id: 'be2', name: 'Backend 02', url: 'http://localhost:8082' },
+  { id: 'be3', name: 'Backend 03', url: 'http://localhost:8083' },
+];
+
+// Helper function: Gọi API cho một node cụ thể
+// Nó sẽ ghi đè baseURL mặc định của instance 'api'
+const requestNode = (nodeUrl, method, endpoint, data = null, params = {}) => {
+  return api({
+    method,
+    url: endpoint,
+    baseURL: nodeUrl, // 👈 Quan trọng: Ghi đè baseURL chỉ cho request này
+    data,
+    params,
+  });
+};
+
+export const monitoringAPI = {
+  // 1. HEALTH
+  // Lấy health của 1 node cụ thể (dùng cho hàm loadMonitoringData bên Monitor.js)
+  getNodeHealth: (nodeUrl) =>
+    requestNode(nodeUrl, 'GET', '/api/admin/monitoring/health-summary'),
+
+  // 2. CIRCUIT BREAKERS
+  // Quan trọng: Phải nhận tham số nodeUrl để biết gọi vào backend nào
+  getCircuitBreakers: (nodeUrl) =>
+    requestNode(nodeUrl, 'GET', '/api/admin/monitoring/circuit-breakers'),
+
+  resetCircuitBreaker: (nodeUrl, name) =>
+    requestNode(nodeUrl, 'POST', `/api/admin/monitoring/circuit-breakers/${name}/reset`),
+
+  // 3. CACHE
+  getCacheStats: (nodeUrl) =>
+    requestNode(nodeUrl, 'GET', '/api/admin/monitoring/cache'),
+
+  // Clear cache trên TẤT CẢ các node (dùng Promise.all)
+  clearCacheOnAllNodes: (cacheName) => {
+    const promises = BACKEND_NODES.map(node =>
+      requestNode(node.url, 'POST', `/api/admin/monitoring/cache/clear/${cacheName}`)
+    );
+    return Promise.all(promises);
+  },
+
+  clearAllCachesOnAllNodes: () => {
+    const promises = BACKEND_NODES.map(node =>
+      requestNode(node.url, 'POST', '/api/admin/monitoring/cache/clear-all')
+    );
+    return Promise.all(promises);
+  },
+
+  // 4. RATE LIMITS (Thường là Global nếu dùng Redis, gọi node nào cũng được)
+  // Nhưng để chắc chắn, ta cứ gọi api mặc định (qua Load Balancer)
+  getUserRateLimits: (userId) =>
+    api.get(`/api/admin/monitoring/rate-limits/user/${userId}`),
+
+  clearAllRateLimits: () =>
+    api.post('/api/admin/monitoring/rate-limits/clear-all'),
 };
 
 export default api;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
+import Monitor from './Monitor';
 import './AdminPanel.css';
 
 // Import các icon từ FontAwesome
@@ -11,6 +12,7 @@ import {
   FaSync,
   FaSave,
   FaSpinner,
+  FaTachometerAlt,
 } from 'react-icons/fa';
 
 // --- Helper Components --- //
@@ -126,6 +128,7 @@ function UserRow({ user, onUpdateQuota, onUpdatePermissions, updating }) {
 }
 
 function AdminPanel() {
+  const [activeTab, setActiveTab] = useState('users'); // 'users' or 'monitor'
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -231,6 +234,11 @@ function AdminPanel() {
     );
   }
 
+  // Nếu đang xem Monitor, render full page mà không cần admin wrapper
+  if (activeTab === 'monitor') {
+    return <Monitor onBack={() => setActiveTab('users')} />;
+  }
+
   return (
     <div className="admin-scope-wrapper">
       <div className="admin-container">
@@ -238,143 +246,154 @@ function AdminPanel() {
         <header className="admin-header">
           <div>
             <h1>System Administration</h1>
-            <p className="subtitle">Manage users, storage quotas and permissions</p>
+            <p className="subtitle">Manage users, storage quotas, permissions and system monitoring</p>
           </div>
-          <button className="btn btn-primary btn-refresh" onClick={loadData}>
-            <FaSync className={loading ? 'icon-spin' : ''} />
-            Refresh Data
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-primary btn-refresh" onClick={loadData}>
+              <FaSync className={loading ? 'icon-spin' : ''} />
+              Refresh Data
+            </button>
+            <button className="btn btn-primary" onClick={() => setActiveTab('monitor')}>
+              <FaTachometerAlt /> System Monitor
+            </button>
+          </div>
         </header>
 
-        {/* Stats Grid */}
-        {stats && (
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-icon bg-blue-light">
-                <FaUsers />
-              </div>
-              <div className="stat-content">
-                <h3>Total Users</h3>
-                <p className="stat-number">{stats.totalUsers || 0}</p>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon bg-purple-light">
-                <FaHdd />
-              </div>
-              <div className="stat-content">
-                <h3>Storage Used</h3>
-                <p className="stat-number">{formatBytes(stats.totalStorageUsed)}</p>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon bg-green-light">
-                <FaCloud />
-              </div>
-              <div className="stat-content">
-                <h3>Total Quota</h3>
-                <p className="stat-number">{formatBytes(stats.totalStorageQuota)}</p>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon bg-orange-light">
-                <FaChartPie />
-              </div>
-              <div className="stat-content">
-                <h3>Overall Usage</h3>
-                <p className="stat-number">
-                  {stats.usagePercentage ? stats.usagePercentage.toFixed(1) : 0}%
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="dashboard-grid">
-          {/* Main Table Section */}
-          <div className="card table-section">
-            <div className="card-header">
-              <h2>User Management</h2>
-              <div style={{ fontSize: '14px' }} className="badge badge-neutral">{users.length} users</div>
-            </div>
-            <div className="table-responsive">
-              <table className="modern-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>User</th>
-                    <th>Role</th>
-                    <th>Used</th>
-                    <th>Set Quota</th>
-                    <th style={{ width: '15%' }}>Usage</th>
-                    <th>Permissions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <UserRow
-                      key={user.id}
-                      user={user}
-                      onUpdateQuota={handleUpdateQuota}
-                      onUpdatePermissions={handleUpdatePermissions}
-                      updating={updating}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Sidebar Section */}
-          <div className="sidebar-section">
-            {/* Global Actions */}
-            <div className="card action-card">
-              <h3>
-                Global Actions
-              </h3>
-              <p className="text-small text-muted">Update storage quota for all users at once.</p>
-              <div className="input-group">
-                <input
-                  type="number"
-                  placeholder="GB Amount"
-                  value={globalQuota}
-                  onChange={(e) => setGlobalQuota(e.target.value)}
-                />
-                <button
-                  className="btn btn-primary"
-                  onClick={handleUpdateAllQuotas}
-                  disabled={updating.globalQuota}
-                >
-                  {updating.globalQuota}
-                  Apply All
-                </button>
-              </div>
-            </div>
-
-            {/* Top Consumers List */}
-            {stats && stats.topConsumers && stats.topConsumers.length > 0 && (
-              <div className="card consumers-card">
-                <h3>Top Consumers</h3>
-                <ul className="consumer-list">
-                  {stats.topConsumers.map((consumer, idx) => (
-                    <li key={consumer.id} className="consumer-item">
-                      <div className="consumer-rank">{idx + 1}</div>
-                      <div className="consumer-info">
-                        <strong>{consumer.username}</strong>
-                        <div className="consumer-meta">
-                          {formatBytes(consumer.storageUsed)} used
-                        </div>
-                      </div>
-                      <div className="mini-pie" style={{
-                        background: `conic-gradient(#4f46e5 ${consumer.usagePercentage}%, #e5e7eb 0)`
-                      }}></div>
-                    </li>
-                  ))}
-                </ul>
+        {/* Tab Content */}
+        {activeTab === 'users' && (
+          <>
+            {/* Stats Grid */}
+            {stats && (
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <div className="stat-icon bg-blue-light">
+                    <FaUsers />
+                  </div>
+                  <div className="stat-content">
+                    <h3>Total Users</h3>
+                    <p className="stat-number">{stats.totalUsers || 0}</p>
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-icon bg-purple-light">
+                    <FaHdd />
+                  </div>
+                  <div className="stat-content">
+                    <h3>Storage Used</h3>
+                    <p className="stat-number">{formatBytes(stats.totalStorageUsed)}</p>
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-icon bg-green-light">
+                    <FaCloud />
+                  </div>
+                  <div className="stat-content">
+                    <h3>Total Quota</h3>
+                    <p className="stat-number">{formatBytes(stats.totalStorageQuota)}</p>
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-icon bg-orange-light">
+                    <FaChartPie />
+                  </div>
+                  <div className="stat-content">
+                    <h3>Overall Usage</h3>
+                    <p className="stat-number">
+                      {stats.usagePercentage ? stats.usagePercentage.toFixed(1) : 0}%
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
-          </div>
-        </div>
+
+            <div className="dashboard-grid">
+              {/* Main Table Section */}
+              <div className="card table-section">
+                <div className="card-header">
+                  <h2>User Management</h2>
+                  <div style={{ fontSize: '14px' }} className="badge badge-neutral">{users.length} users</div>
+                </div>
+                <div className="table-responsive">
+                  <table className="modern-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Used</th>
+                        <th>Set Quota</th>
+                        <th style={{ width: '15%' }}>Usage</th>
+                        <th>Permissions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user) => (
+                        <UserRow
+                          key={user.id}
+                          user={user}
+                          onUpdateQuota={handleUpdateQuota}
+                          onUpdatePermissions={handleUpdatePermissions}
+                          updating={updating}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Sidebar Section */}
+              <div className="sidebar-section">
+                {/* Global Actions */}
+                <div className="card action-card">
+                  <h3>
+                    Global Actions
+                  </h3>
+                  <p className="text-small text-muted">Update storage quota for all users at once.</p>
+                  <div className="input-group">
+                    <input
+                      type="number"
+                      placeholder="GB Amount"
+                      value={globalQuota}
+                      onChange={(e) => setGlobalQuota(e.target.value)}
+                    />
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleUpdateAllQuotas}
+                      disabled={updating.globalQuota}
+                    >
+                      {updating.globalQuota}
+                      Apply All
+                    </button>
+                  </div>
+                </div>
+
+                {/* Top Consumers List */}
+                {stats && stats.topConsumers && stats.topConsumers.length > 0 && (
+                  <div className="card consumers-card">
+                    <h3>Top Consumers</h3>
+                    <ul className="consumer-list">
+                      {stats.topConsumers.map((consumer, idx) => (
+                        <li key={consumer.id} className="consumer-item">
+                          <div className="consumer-rank">{idx + 1}</div>
+                          <div className="consumer-info">
+                            <strong>{consumer.username}</strong>
+                            <div className="consumer-meta">
+                              {formatBytes(consumer.storageUsed)} used
+                            </div>
+                          </div>
+                          <div className="mini-pie" style={{
+                            background: `conic-gradient(#4f46e5 ${consumer.usagePercentage}%, #e5e7eb 0)`
+                          }}></div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
       </div>
     </div>
   );

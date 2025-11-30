@@ -15,7 +15,6 @@ import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
@@ -35,7 +34,8 @@ public class AzureSasService {
 
     @CircuitBreaker(name = "azureService", fallbackMethod = "generateBlobReadSasFallback")
     @Retry(name = "azureService")
-    @Cacheable(value = "sasUrls", key = "#blobName + '_' + #user.id")
+    // Removed @Cacheable to prevent conflicts with Circuit Breaker and Retry
+    // Cache should be handled at a higher level (e.g., in FileService)
     public String generateBlobReadSas(String blobName, int expiryMinutes, User user) throws InterruptedException {
         log.warn(">>> Retry calling Azure now...");
         log.debug("Generating SAS URL for blob: {}", blobName);

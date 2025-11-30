@@ -206,7 +206,7 @@
 
 /* Scrollable File List Container */
 .file-list-container {
-  max-height: calc(100vh - 280px);
+  max-height: calc(100vh - 80px);
   overflow-y: auto;
   overflow-x: hidden;
   border-top: 1px solid #e5e7eb;

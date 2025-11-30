@@ -2,7 +2,46 @@ import React, { useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
 import './AdminPanel.css';
 
-// UserRow component for individual user management
+// Import các icon từ FontAwesome
+import {
+  FaUsers,
+  FaHdd,
+  FaCloud,
+  FaChartPie,
+  FaSync,
+  FaSave,
+  FaSpinner,
+} from 'react-icons/fa';
+
+// --- Helper Components --- //
+
+const Badge = ({ type, children }) => (
+  <span className={`badge badge-${type.toLowerCase()}`}>{children}</span>
+);
+
+const ProgressBar = ({ percentage }) => {
+  let colorClass = 'bg-success';
+  if (percentage > 90) colorClass = 'bg-danger';
+  else if (percentage > 70) colorClass = 'bg-warning';
+
+  return (
+    <div className="progress-wrapper">
+      <div className="progress-text">
+        <span>Usage</span>
+        <span>{percentage.toFixed(1)}%</span>
+      </div>
+      <div className="progress-track">
+        <div
+          className={`progress-fill ${colorClass}`}
+          style={{ width: `${Math.min(percentage, 100)}%` }}
+        ></div>
+      </div>
+    </div>
+  );
+};
+
+// --- Main Components --- //
+
 function UserRow({ user, onUpdateQuota, onUpdatePermissions, updating }) {
   const [quotaInput, setQuotaInput] = useState((user.storageQuota || 0) / (1024 * 1024 * 1024));
 
@@ -24,97 +63,63 @@ function UserRow({ user, onUpdateQuota, onUpdatePermissions, updating }) {
 
   return (
     <tr>
-      <td>{user.id}</td>
+      <td className="text-muted">#{user.id}</td>
       <td>
-        <div className="user-info">
-          <strong>{user.username}</strong>
+        <div className="user-profile">
+          <div className="user-name">{user.username}</div>
         </div>
       </td>
       <td>
-        <span className={`role-badge ${user.role === 'ROLE_ADMIN' ? 'role-admin' : 'role-user'}`}>
-          {user.role === 'ROLE_ADMIN' ? '👑 Admin' : '👤 User'}
-        </span>
+        <Badge type={user.role === 'ROLE_ADMIN' ? 'admin' : 'user'}>
+          {user.role === 'ROLE_ADMIN' ? 'Admin' : 'User'}
+        </Badge>
       </td>
-      <td>{formatBytes(user.storageUsed || 0)}</td>
+      <td className="font-mono">{formatBytes(user.storageUsed || 0)}</td>
       <td>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="quota-control">
           <input
             type="number"
             step="0.1"
             min="0.1"
             value={quotaInput}
             onChange={(e) => setQuotaInput(parseFloat(e.target.value) || 0)}
-            className="form-input"
-            style={{ width: '80px' }}
             disabled={updating[`quota_${user.id}`]}
           />
-          <span>GB</span>
+          <span className="unit">GB</span>
           <button
-            className="btn btn-small btn-primary"
+            className="btn-icon"
             onClick={() => onUpdateQuota(user.id, quotaInput)}
             disabled={updating[`quota_${user.id}`]}
+            title="Save Quota"
           >
-            {updating[`quota_${user.id}`] ? '⏳' : '💾'}
+            {updating[`quota_${user.id}`] ? (
+              <FaSpinner className="icon-spin" />
+            ) : (
+              <FaSave />
+            )}
           </button>
         </div>
       </td>
       <td>
-        {usagePercentage.toFixed(2)}%
-        <div className="mini-bar">
-          <div
-            className="mini-bar-fill"
-            style={{
-              width: `${Math.min(usagePercentage, 100)}%`,
-              backgroundColor: usagePercentage > 90 ? '#f44336' : usagePercentage > 70 ? '#ff9800' : '#4CAF50'
-            }}
-          ></div>
-        </div>
+        <ProgressBar percentage={usagePercentage} />
       </td>
       <td>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <label>
-            <input
-              type="checkbox"
-              checked={user.create !== false}
-              onChange={(e) => onUpdatePermissions(user.id, {
-                create: e.target.checked,
-                read: user.read,
-                write: user.write
-              })}
-              disabled={updating[`perm_${user.id}`]}
-            />
-            Create
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={user.read === true}
-              onChange={(e) => onUpdatePermissions(user.id, {
-                create: user.create,
-                read: e.target.checked,
-                write: user.write
-              })}
-              disabled={updating[`perm_${user.id}`]}
-            />
-            Read
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={user.write !== false}
-              onChange={(e) => onUpdatePermissions(user.id, {
-                create: user.create,
-                read: user.read,
-                write: e.target.checked
-              })}
-              disabled={updating[`perm_${user.id}`]}
-            />
-            Write
-          </label>
+        <div className="permissions-grid">
+          {['create', 'read', 'write'].map(perm => (
+            <label key={perm} className="perm-checkbox">
+              <input
+                type="checkbox"
+                checked={user[perm] !== false && (perm !== 'read' || user.read === true)}
+                onChange={(e) => onUpdatePermissions(user.id, {
+                  ...user,
+                  [perm]: e.target.checked
+                })}
+                disabled={updating[`perm_${user.id}`]}
+              />
+              <span className="perm-label">{perm}</span>
+            </label>
+          ))}
         </div>
-      </td>
-      <td>
-        {updating[`perm_${user.id}`] && <span>⏳</span>}
       </td>
     </tr>
   );
@@ -141,25 +146,13 @@ function AdminPanel() {
       ]);
 
       let usersData = usersRes.data;
-
-      // Extract users array from response
-      if (usersData && Array.isArray(usersData.users)) {
-        usersData = usersData.users;
-      } else if (Array.isArray(usersData)) {
-        usersData = usersData;
-      } else {
-        console.warn('⚠️ [AdminPanel] Unexpected users response format:', usersData);
-        usersData = [];
-      }
+      if (usersData && Array.isArray(usersData.users)) usersData = usersData.users;
+      else if (!Array.isArray(usersData)) usersData = [];
 
       setUsers(usersData);
       setStats(statsRes.data || {});
     } catch (err) {
-      console.error('Failed to load admin data:', err);
-      console.error('Error response:', err.response?.data);
-      setUsers([]);
-      setStats({});
-      alert(err.response?.data?.message || 'Failed to load admin data');
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -178,7 +171,6 @@ function AdminPanel() {
     try {
       await adminAPI.updatePermissions(userId, permissions);
       await loadData();
-      alert('Permissions updated successfully');
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to update permissions');
     } finally {
@@ -211,7 +203,7 @@ function AdminPanel() {
       return;
     }
 
-    if (!window.confirm(`Update storage quota to ${quotaGb} GB for ALL users?`)) {
+    if (!window.confirm(`Are you sure you want to update storage quota to ${quotaGb} GB for ALL users?`)) {
       return;
     }
 
@@ -228,120 +220,164 @@ function AdminPanel() {
     }
   };
 
+
   if (loading) {
-    return <div className="loading">Loading admin panel...</div>;
+    return (
+      <div className="loading-screen">
+        {/* Thay thế CSS spinner bằng Icon FaSpinner */}
+        <FaSpinner className="spinner icon-spin" size={40} />
+        <p>Initializing Admin Dashboard...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="admin-panel">
-      <div className="admin-panel-header">
-        <h2>🔧 Admin Panel</h2>
-        <button className="btn btn-primary" onClick={loadData}>
-          🔄 Refresh
-        </button>
-      </div>
-
-      {/* System Statistics */}
-      {stats && (
-        <div className="admin-stats">
-          <div className="stat-card">
-            <span className="stat-label">Total Users</span>
-            <span className="stat-value">{stats.totalUsers || 0}</span>
+    <div className="admin-scope-wrapper">
+      <div className="admin-container">
+        {/* Header Section */}
+        <header className="admin-header">
+          <div>
+            <h1>System Administration</h1>
+            <p className="subtitle">Manage users, storage quotas and permissions</p>
           </div>
-          <div className="stat-card">
-            <span className="stat-label">Total Storage Used</span>
-            <span className="stat-value">{formatBytes(stats.totalStorageUsed)}</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Total Storage Quota</span>
-            <span className="stat-value">{formatBytes(stats.totalStorageQuota)}</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Usage Percentage</span>
-            <span className="stat-value">
-              {stats.usagePercentage ? stats.usagePercentage.toFixed(2) : 0}%
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Global Quota Update */}
-      <div className="global-quota">
-        <h3>🌐 Update All User Quotas</h3>
-        <div className="global-quota-controls">
-          <input
-            type="number"
-            step="0.1"
-            min="0.1"
-            placeholder="Quota in GB"
-            value={globalQuota}
-            onChange={(e) => setGlobalQuota(e.target.value)}
-            className="form-input"
-            style={{ width: '200px' }}
-          />
-          <button
-            className="btn btn-primary"
-            onClick={handleUpdateAllQuotas}
-            disabled={updating.globalQuota}
-          >
-            {updating.globalQuota ? '⏳ Updating...' : 'Update All'}
+          <button className="btn btn-primary btn-refresh" onClick={loadData}>
+            <FaSync className={loading ? 'icon-spin' : ''} />
+            Refresh Data
           </button>
-        </div>
-      </div>
+        </header>
 
-      {/* Top Consumers */}
-      {stats && stats.topConsumers && stats.topConsumers.length > 0 && (
-        <div className="top-consumers">
-          <h3>📊 Top {topN} Storage Consumers</h3>
-          <ul>
-            {stats.topConsumers.map((consumer) => (
-              <li key={consumer.id}>
-                <strong>{consumer.username}</strong>: {formatBytes(consumer.storageUsed)} / {formatBytes(consumer.storageQuota)}
-                ({consumer.usagePercentage ? consumer.usagePercentage.toFixed(2) : 0}%)
-                <div className="mini-bar">
-                  <div
-                    className="mini-bar-fill"
-                    style={{ width: `${Math.min(consumer.usagePercentage || 0, 100)}%` }}
-                  ></div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        {/* Stats Grid */}
+        {stats && (
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-icon bg-blue-light">
+                <FaUsers />
+              </div>
+              <div className="stat-content">
+                <h3>Total Users</h3>
+                <p className="stat-number">{stats.totalUsers || 0}</p>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon bg-purple-light">
+                <FaHdd />
+              </div>
+              <div className="stat-content">
+                <h3>Storage Used</h3>
+                <p className="stat-number">{formatBytes(stats.totalStorageUsed)}</p>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon bg-green-light">
+                <FaCloud />
+              </div>
+              <div className="stat-content">
+                <h3>Total Quota</h3>
+                <p className="stat-number">{formatBytes(stats.totalStorageQuota)}</p>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon bg-orange-light">
+                <FaChartPie />
+              </div>
+              <div className="stat-content">
+                <h3>Overall Usage</h3>
+                <p className="stat-number">
+                  {stats.usagePercentage ? stats.usagePercentage.toFixed(1) : 0}%
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
-      {/* User Management Table */}
-      <div className="admin-table-wrapper">
-        <h3>👥 User Management</h3>
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Username</th>
-              <th>Role</th>
-              <th>Storage Used</th>
-              <th>Storage Quota</th>
-              <th>Usage %</th>
-              <th>Permissions</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <UserRow
-                key={user.id}
-                user={user}
-                onUpdateQuota={handleUpdateQuota}
-                onUpdatePermissions={handleUpdatePermissions}
-                updating={updating}
-              />
-            ))}
-          </tbody>
-        </table>
+        <div className="dashboard-grid">
+          {/* Main Table Section */}
+          <div className="card table-section">
+            <div className="card-header">
+              <h2>User Management</h2>
+              <div style={{ fontSize: '14px' }} className="badge badge-neutral">{users.length} users</div>
+            </div>
+            <div className="table-responsive">
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>Used</th>
+                    <th>Set Quota</th>
+                    <th style={{ width: '15%' }}>Usage</th>
+                    <th>Permissions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((user) => (
+                    <UserRow
+                      key={user.id}
+                      user={user}
+                      onUpdateQuota={handleUpdateQuota}
+                      onUpdatePermissions={handleUpdatePermissions}
+                      updating={updating}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Sidebar Section */}
+          <div className="sidebar-section">
+            {/* Global Actions */}
+            <div className="card action-card">
+              <h3>
+                Global Actions
+              </h3>
+              <p className="text-small text-muted">Update storage quota for all users at once.</p>
+              <div className="input-group">
+                <input
+                  type="number"
+                  placeholder="GB Amount"
+                  value={globalQuota}
+                  onChange={(e) => setGlobalQuota(e.target.value)}
+                />
+                <button
+                  className="btn btn-primary"
+                  onClick={handleUpdateAllQuotas}
+                  disabled={updating.globalQuota}
+                >
+                  {updating.globalQuota}
+                  Apply All
+                </button>
+              </div>
+            </div>
+
+            {/* Top Consumers List */}
+            {stats && stats.topConsumers && stats.topConsumers.length > 0 && (
+              <div className="card consumers-card">
+                <h3>Top Consumers</h3>
+                <ul className="consumer-list">
+                  {stats.topConsumers.map((consumer, idx) => (
+                    <li key={consumer.id} className="consumer-item">
+                      <div className="consumer-rank">{idx + 1}</div>
+                      <div className="consumer-info">
+                        <strong>{consumer.username}</strong>
+                        <div className="consumer-meta">
+                          {formatBytes(consumer.storageUsed)} used
+                        </div>
+                      </div>
+                      <div className="mini-pie" style={{
+                        background: `conic-gradient(#4f46e5 ${consumer.usagePercentage}%, #e5e7eb 0)`
+                      }}></div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 export default AdminPanel;
-

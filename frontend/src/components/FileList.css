@@ -1,3 +1,6 @@
+/* ============================================
+   FILE LIST
+   ============================================ */
 .file-list {
   width: 100%;
   overflow: visible;
@@ -15,11 +18,303 @@
   /* Firefox */
 }
 
+/* ============================================
+   VIRTUAL TABLE STRUCTURE
+   ============================================ */
+
+/* Virtual Table Header */
+.virtual-table-header {
+  width: 100%;
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.virtual-header-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+}
+
+.virtual-header-cell {
+  padding: 1rem;
+  font-weight: 600;
+  color: #555;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+/* Virtual Table Body (List Container) */
+.virtual-list {
+  width: 100%;
+  overflow: auto !important;
+}
+
+/* Virtual Row */
+.virtual-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.15s ease;
+}
+
+.virtual-row:hover {
+  background: #f9fafb;
+}
+
+.virtual-row.selected {
+  background: #e0f2fe;
+}
+
+.virtual-row.selected:hover {
+  background: #bae6fd;
+}
+
+.virtual-row.deleting {
+  opacity: 0.6;
+  background: #fef2f2;
+}
+
+.virtual-row.deleting:hover {
+  background: #fee2e2;
+}
+
+.virtual-cell {
+  padding: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   COLUMN WIDTHS (Flexbox-based)
+   ============================================ */
+
+/* Checkbox Column */
+.checkbox-cell {
+  width: 50px;
+  flex-shrink: 0;
+}
+
+/* Name Column - 40% */
+.name-cell {
+  width: 40%;
+  flex-grow: 0;
+  flex-shrink: 1;
+  min-width: 200px;
+}
+
+/* Size Column - 10% */
+.size-cell {
+  width: 10%;
+  flex-grow: 0;
+  flex-shrink: 1;
+  min-width: 80px;
+}
+
+/* Uploaded Column - 15% */
+.uploaded-cell {
+  width: 15%;
+  flex-grow: 0;
+  flex-shrink: 1;
+  min-width: 120px;
+}
+
+/* Actions Column - 35% */
+.actions-cell {
+  width: 35%;
+  flex-grow: 0;
+  flex-shrink: 1;
+  min-width: 250px;
+}
+
+/* ============================================
+   FILE/FOLDER NAME STYLING
+   ============================================ */
+
+.file-name {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 500;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.file-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 500px;
+}
+
+.file-icon {
+  color: #667eea;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.folder-icon {
+  flex-shrink: 0;
+}
+
+/* ============================================
+   ACTIONS & BUTTONS
+   ============================================ */
+
+.file-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.btn-icon:hover {
+  background: #f3f4f6;
+  color: #333;
+}
+
+.btn-icon.btn-success {
+  color: #10b981;
+}
+
+.btn-icon.btn-success:hover {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.btn-icon:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ============================================
+   BADGES & INDICATORS
+   ============================================ */
+
+.public-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.spinner-small {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+  font-size: 0.9em;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+   MODALS
+   ============================================ */
+
+.modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #9ca3af;
+  font-size: 1.1rem;
+}
+
+.empty-state svg {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.text-muted {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+@media (max-width: 768px) {
+
+  .virtual-header-cell,
+  .virtual-cell {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .file-actions {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .name-cell {
+    width: 35%;
+    min-width: 150px;
+  }
+
+  .actions-cell {
+    width: 40%;
+    min-width: 200px;
+  }
+}
+
+/* ============================================
+   LEGACY TABLE STYLES (for backwards compatibility)
+   Keep these for other components that might use them
+   ============================================ */
+
 .file-table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  /* Cho phép truncate text đúng cách */
 }
 
 .file-table thead {
@@ -37,31 +332,26 @@
 .file-table th:first-child,
 .file-table td:first-child {
   width: 50px;
-  /* Checkbox column */
 }
 
 .file-table th:nth-child(2),
 .file-table td:nth-child(2) {
   width: 40%;
-  /* Name column - chiếm 40% chiều rộng */
 }
 
 .file-table th:nth-child(3),
 .file-table td:nth-child(3) {
   width: 10%;
-  /* Size column */
 }
 
 .file-table th:nth-child(4),
 .file-table td:nth-child(4) {
   width: 15%;
-  /* Uploaded column */
 }
 
 .file-table th:last-child,
 .file-table td:last-child {
   width: 35%;
-  /* Actions column */
 }
 
 .file-table td {
@@ -73,7 +363,6 @@
 
 .file-table td:nth-child(2) {
   white-space: nowrap;
-  /* Truncate tên file dài */
 }
 
 .file-table td:nth-child(3),
@@ -95,138 +384,6 @@
 
 .file-table tbody tr.selected:hover {
   background: #bae6fd;
-}
-
-.file-name {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-weight: 500;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.file-name span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 500px;
-  /* Giới hạn chiều rộng tối đa */
-}
-
-.file-icon {
-  color: #667eea;
-  font-size: 1.1rem;
-}
-
-.file-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.btn-icon {
-  background: none;
-  border: none;
-  padding: 0.5rem;
-  cursor: pointer;
-  color: #666;
-  transition: all 0.2s;
-  border-radius: 4px;
-}
-
-.btn-icon:hover {
-  background: #f3f4f6;
-  color: #333;
-}
-
-/* .btn-icon.btn-danger:hover {
-  background: #fee;
-  color: #ef4444;
-} */
-
-.btn-icon.btn-success {
-  color: #10b981;
-}
-
-.btn-icon.btn-success:hover {
-  background: #d1fae5;
-  color: #059669;
-}
-
-/* .btn-icon.btn-warning {
-  color: #f59e0b;
-}
-
-.btn-icon.btn-warning:hover {
-  background: #fef3c7;
-  color: #d97706;
-} */
-
-.text-muted {
-  color: #9ca3af;
-  font-style: italic;
-}
-
-.public-badge {
-  display: inline-block;
-  margin-top: 0.2rem;
-  padding: 0.2rem 0.5rem;
-  background: #dbeafe;
-  color: #1e40af;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-  margin-top: 1rem;
-}
-
-@media (max-width: 768px) {
-  .file-table {
-    font-size: 0.9rem;
-  }
-
-  .file-table th,
-  .file-table td {
-    padding: 0.75rem 0.5rem;
-  }
-
-  .file-actions {
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-}
-
-.btn-icon:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.spinner-small {
-  display: inline-block;
-  animation: spin 1s linear infinite;
-  font-size: 0.9em;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.btn-danger:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  pointer-events: none;
 }
 
 .file-table tbody tr.deleting {

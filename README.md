@@ -122,37 +122,6 @@ Hệ thống sử dụng **Resilience4j** để xử lý lỗi và tăng độ t
   - Lần 2: 8 giây (2 × 4)
 - **Retry exceptions**: Tất cả Exception (trừ IllegalArgumentException)
 
-
-## Monitoring và Observability
-
-Hệ thống cung cấp các endpoints monitoring để theo dõi sức khỏe và hiệu năng:
-
-### Monitoring Endpoints (`/api/admin/monitoring`):
-
-1. **Circuit Breaker Status** (`GET /circuit-breakers`)
-   - Trạng thái của tất cả circuit breakers
-   - Metrics: state, failure rate, số lượng calls (successful/failed/buffered/not permitted)
-
-2. **Retry Metrics** (`GET /retries`)
-   - Metrics về retry operations
-   - Số lượng calls thành công/có retry, số lượng calls failed
-
-3. **Health Summary** (`GET /health-summary`)
-   - Tổng quan sức khỏe hệ thống
-   - Số lượng circuit breakers đang OPEN
-   - Tổng số caches
-   - Overall status: HEALTHY hoặc DEGRADED
-
-### Spring Boot Actuator:
-
-Hệ thống expose các actuator endpoints:
-- `/actuator/health`: Health check
-- `/actuator/metrics`: Metrics
-- `/actuator/prometheus`: Prometheus metrics
-- `/actuator/circuitbreakers`: Circuit breaker metrics
-- `/actuator/ratelimiters`: Rate limiter metrics
-
-
 ## Redis Configuration
 
 Redis được sử dụng cho nhiều mục đích:
@@ -197,4 +166,35 @@ Hệ thống được thiết kế để scale horizontally:
 - **Shared cache**: Redis cache được share giữa tất cả instances
 - **Shared rate limiting**: Bucket4j với Redis cho distributed rate limiting
 - **Load balancer**: Nginx phân phối request tự động
+
+
+## Monitoring và Observability
+
+Hệ thống cung cấp các endpoints monitoring để theo dõi sức khỏe và hiệu năng:
+
+### Monitoring Endpoints (`/api/admin/monitoring`):
+
+1. **Circuit Breaker Status** (`GET /circuit-breakers`)
+   - Trạng thái của tất cả circuit breakers
+   - Metrics: state, failure rate, số lượng calls (successful/failed/buffered/not permitted)
+
+2. **Retry Metrics** (`GET /retries`)
+   - Metrics về retry operations
+   - Số lượng calls thành công/có retry, số lượng calls failed
+
+3. **Health Summary** (`GET /health-summary`)
+   - Tổng quan sức khỏe hệ thống
+   - Số lượng circuit breakers đang OPEN
+   - Tổng số caches
+   - Overall status: HEALTHY hoặc DEGRADED
+
+### Spring Boot Actuator:
+
+Hệ thống expose các actuator endpoints:
+- `/actuator/health`: Health check
+- `/actuator/metrics`: Metrics
+- `/actuator/prometheus`: Prometheus metrics
+- `/actuator/circuitbreakers`: Circuit breaker metrics
+- `/actuator/ratelimiters`: Rate limiter metrics
+
 

@@ -37,10 +37,10 @@ Bucket4j sử dụng Redis để lưu trữ rate limit buckets theo user/session
 
 **File Write Operations**
 - `FILE_WRITE`: 30 requests/phút per user (upload, delete, move, rename)
-- `FILE_SHARE`: 20 requests/phút per user (share/unshare)
+- `FILE_SHARE`: 30 requests/phút per user (share/unshare)
 
 **Bulk Operations**
-- `BULK_OPERATION`: 5 requests/phút per user (bulk delete/move)
+- `BULK_OPERATION`: 10 requests/phút per user (bulk delete/move)
 - `BULK_DOWNLOAD`: 10 requests/phút per user (ZIP creation)
 
 **Folder Operations**
@@ -57,7 +57,7 @@ Các endpoint read-only không bị rate limit để đảm bảo UX tốt:
 - Folder tree, breadcrumb, list
 - File list, metadata, search
 - Storage info
-- User info (`/user`)
+- User info 
 - Admin monitoring (GET requests)
 
 

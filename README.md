@@ -2,7 +2,7 @@
 
 ## Tổng Quan
 
-Valet Key là một hệ thống quản lý file đám mây được xây dựng với kiến trúc microservices, tích hợp Azure Blob Storage để lưu trữ file và cung cấp các tính năng bảo mật, hiệu năng cao với khả năng mở rộng tốt.
+Valet Key là một hệ thống quản lý file đám mây, tích hợp Azure Blob Storage để lưu trữ file và cung cấp các tính năng bảo mật, hiệu năng cao với khả năng mở rộng tốt.
 
 ## Kiến Trúc Hệ Thống
 

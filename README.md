@@ -92,8 +92,8 @@ Hệ thống sử dụng **Redis Cache** với các TTL (Time To Live) khác nha
    - Cây thư mục của user
    - Thay đổi ít thường xuyên hơn file operations
 
-
-
+## Valet Key
+Up load file trực tiếp lên Azure
 
 ## Circuit Breaker và Retry
 

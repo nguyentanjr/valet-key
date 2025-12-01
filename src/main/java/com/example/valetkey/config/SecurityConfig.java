@@ -86,7 +86,6 @@ public class SecurityConfig {
                         .requestMatchers("/login","/logout","/h2-console/**",
                                 "/user/list-blob/**","/user/upload-sas/**","/debug/**","/debug/session","/debug/role",
                                 "/api/public/**","/whoami/**").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/user", "/api/**").authenticated() // User info and API endpoints require authentication
                         .anyRequest().authenticated() // All other endpoints require authentication
                 )

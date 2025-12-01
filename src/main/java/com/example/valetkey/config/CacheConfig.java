@@ -41,6 +41,7 @@ public class CacheConfig {
         cacheConfigurations.put("folderTree", defaultConfig.entryTtl(Duration.ofMinutes(5)));
         
         cacheConfigurations.put("searchResults", defaultConfig.entryTtl(Duration.ofMinutes(2)));
+
         
         return RedisCacheManager.builder(redisConnectionFactory)
             .cacheDefaults(defaultConfig)

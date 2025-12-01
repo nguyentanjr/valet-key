@@ -34,7 +34,8 @@ services:
         condition: service_started
     expose:
       - "8080"
-
+#    extra_hosts:
+#      - "nguyentanstorage.blob.core.windows.net:127.0.0.1"
 
 
   backend2:
@@ -58,6 +59,8 @@ services:
         condition: service_started
     expose:
       - "8080"
+#    extra_hosts:
+#      - "nguyentanstorage.blob.core.windows.net:127.0.0.1"
 
 
   backend3:
@@ -81,6 +84,8 @@ services:
         condition: service_started
     expose:
       - "8080"
+#    extra_hosts:
+#      - "nguyentanstorage.blob.core.windows.net:127.0.0.1"
 
 
   db:

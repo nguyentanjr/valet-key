@@ -119,6 +119,7 @@ Hệ thống sử dụng **Resilience4j** để xử lý lỗi và tăng độ t
 **Fallback Methods:**
 - `generateBlobReadSasFallback`: Trả về error message khi không thể generate SAS
 - `deleteBlobFallback`: Log error và throw exception khi không thể delete
+- `generateBlobWriteSas`: Trả về error message khi không thể generate SAS
 
 ### Retry Configuration:
 

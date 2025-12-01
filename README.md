@@ -27,10 +27,6 @@ Hệ thống triển khai **hai lớp bảo vệ rate limiting** để chống D
 
 Nginx áp dụng rate limiting dựa trên IP address để bảo vệ tổng thể hệ thống:
 
-- **Login**: 10 requests/phút, burst=3 
-- **Upload**: 60 requests/phút, burst=10 
-- **Public access**: 30 requests/phút, burst=5 
-- **API general**: 120 requests/phút, burst=30 
 
 ### Lớp 2: Bucket4j 
 
@@ -88,15 +84,11 @@ Hệ thống sử dụng **Redis Cache** với các TTL (Time To Live) khác nha
    - Metadata của file (tên, kích thước, contentType, etc.)
    - Dữ liệu ít thay đổi sau khi upload
 
-3. **fileList** (1 phút)
-   - Danh sách files trong folder
-   - TTL ngắn để user thấy files mới ngay sau khi upload
-
-4. **userStorage** (1 phút)
+3. **userStorage** (1 phút)
    - Thông tin storage của user (dung lượng đã dùng, quota)
    - TTL ngắn để đảm bảo accuracy cho quota enforcement
 
-5. **folderTree** (5 phút)
+4. **folderTree** (5 phút)
    - Cây thư mục của user
    - Thay đổi ít thường xuyên hơn file operations
 
@@ -136,7 +128,6 @@ Hệ thống sử dụng **Resilience4j** để xử lý lỗi và tăng độ t
 - **Exponential backoff**: Enabled với multiplier=4
   - Lần 1: 2 giây
   - Lần 2: 8 giây (2 × 4)
-  - Lần 3: 32 giây (8 × 4)
 - **Retry exceptions**: Tất cả Exception (trừ IllegalArgumentException)
 
 
@@ -154,29 +145,11 @@ Hệ thống cung cấp các endpoints monitoring để theo dõi sức khỏe v
    - Metrics về retry operations
    - Số lượng calls thành công/có retry, số lượng calls failed
 
-3. **Cache Statistics** (`GET /cache`)
-   - Thông tin về các cache đang active
-   - Cache type, name, và các stats khác
-
-4. **Rate Limit Stats** (`GET /rate-limits/user/{userId}`)
-   - Thống kê rate limit buckets của một user
-   - Available tokens và capacity cho mỗi rate limit type
-
-5. **Health Summary** (`GET /health-summary`)
+3. **Health Summary** (`GET /health-summary`)
    - Tổng quan sức khỏe hệ thống
    - Số lượng circuit breakers đang OPEN
    - Tổng số caches
    - Overall status: HEALTHY hoặc DEGRADED
-
-6. **Cache Management**
-   - `POST /cache/clear/{cacheName}`: Xóa một cache cụ thể
-   - `POST /cache/clear-all`: Xóa tất cả caches
-
-7. **Rate Limit Management**
-   - `POST /rate-limits/clear-all`: Xóa tất cả rate limit buckets
-
-8. **Circuit Breaker Control**
-   - `POST /circuit-breakers/{name}/reset`: Reset circuit breaker về CLOSED state
 
 ### Spring Boot Actuator:
 

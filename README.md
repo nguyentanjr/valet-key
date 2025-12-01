@@ -34,14 +34,12 @@ Bucket4j sử dụng Redis để lưu trữ rate limit buckets theo user/session
 
 #### Phân loại Rate Limits:
 
-**Authentication**
-- `LOGIN`: 5 requests/phút per IP
 
 **File Write Operations**
 - `FILE_WRITE`: 30 requests/phút per user (upload, delete, move, rename)
 - `FILE_SHARE`: 20 requests/phút per user (share/unshare)
 
-**Bulk Operations **
+**Bulk Operations**
 - `BULK_OPERATION`: 5 requests/phút per user (bulk delete/move)
 - `BULK_DOWNLOAD`: 10 requests/phút per user (ZIP creation)
 
@@ -52,13 +50,6 @@ Bucket4j sử dụng Redis để lưu trữ rate limit buckets theo user/session
 **Download**
 - `DOWNLOAD`: 100 requests/phút per user (cached SAS URLs)
 
-**Public Access**
-- `PUBLIC_ACCESS_IP`: 30 requests/phút per IP
-- `PUBLIC_DOWNLOAD_TOKEN`: 100 requests/giờ per token
-
-**Admin Operations**
-- `ADMIN_WRITE`: 10 requests/phút per admin
-- `ADMIN_CLEAR`: 5 requests/phút per admin
 
 #### Read-only Operations (No Rate Limit)**
 

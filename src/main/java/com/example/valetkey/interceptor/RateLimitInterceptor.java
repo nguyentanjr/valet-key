@@ -58,6 +58,34 @@ public class RateLimitInterceptor implements HandlerInterceptor {
      */
     private RateLimitService.RateLimitType determineRateLimitType(String uri, String method) {
 
+        // === SKIP RATE LIMIT FOR ESSENTIAL ENDPOINTS ===
+        // These endpoints are required for basic app functionality
+        if (uri.equals("/api/folders/tree") && method.equals("GET")) {
+            return null; // No rate limit - needed for folder navigation
+        }
+        
+        if (uri.matches("/api/folders/.*/breadcrumb") && method.equals("GET")) {
+            return null; // No rate limit - needed for navigation breadcrumb
+        }
+        
+        if (uri.equals("/api/folders/root/breadcrumb") && method.equals("GET")) {
+            return null; // No rate limit - needed for root breadcrumb
+        }
+        
+        if (uri.equals("/api/files/storage") && method.equals("GET")) {
+            return null; // No rate limit - needed for storage info display
+        }
+        
+        if (uri.equals("/user") && method.equals("GET")) {
+            return null; // No rate limit - needed for auth check
+        }
+        
+        if (uri.equals("/api/folders/list") && method.equals("GET")) {
+            return null; // No rate limit - needed for folder listing
+        }
+
+        // === APPLY RATE LIMIT FOR RESOURCE-INTENSIVE OPERATIONS ===
+        
         if (uri.equals("/login") && method.equals("POST")) {
             return RateLimitService.RateLimitType.LOGIN;
         }
@@ -65,7 +93,6 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         if (uri.equals("/api/files/upload/sas-url") && method.equals("POST")) {
             return RateLimitService.RateLimitType.UPLOAD_SMALL;
         }
-
 
         if (uri.equals("/api/files/upload/confirm") && method.equals("POST")) {
             return RateLimitService.RateLimitType.UPLOAD_SMALL;
@@ -91,7 +118,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return RateLimitService.RateLimitType.LIST_FILES;
         }
 
-        return null;
+        return null; // No rate limit for other endpoints
     }
 
 

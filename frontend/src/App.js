@@ -12,23 +12,31 @@ function App() {
 
   useEffect(() => {
     // Check if user is already logged in
+    console.log('🚀 [App] useEffect triggered - checking auth on mount/refresh');
     checkAuth();
   }, []);
 
   const checkAuth = async () => {
+    console.log('🔍 [App] checkAuth() called - checking authentication...');
     try {
       const response = await authAPI.getCurrentUser();
+      console.log('✅ [App] getCurrentUser() response:', response.data);
+      
       if (response.data) {
+        console.log('✅ [App] User authenticated, setting user state:', response.data);
         setUser(response.data);
       } else {
+        console.log('⚠️ [App] No user data in response, setting user to null');
         setUser(null);
       }
     } catch (err) {
       // Not logged in or session expired
       // This is normal when user hasn't logged in yet or session expired
+      console.log('❌ [App] checkAuth failed (not logged in or session expired):', err.message);
       setUser(null);
     } finally {
       setLoading(false);
+      console.log('🏁 [App] checkAuth() completed, loading=false');
     }
   };
 

@@ -32,23 +32,40 @@ public class RateLimitService {
 
 
     public enum RateLimitType {
+        // === SECURITY CRITICAL (Strict) ===
+        // Login - 5 requests per minute per IP
+        // Chống brute force: 5 lần thử/phút là đủ cho user thật
+        LOGIN(5, Duration.ofMinutes(1)),
 
-        LOGIN(7, Duration.ofMinutes(1)),
-
-        UPLOAD_SMALL(20, Duration.ofMinutes(1)),
+        // === RESOURCE INTENSIVE (Balanced) ===
+        // Upload - 30 requests per minute per user
+        // Cho phép upload nhiều files nhỏ liên tục, UX tốt hơn
+        UPLOAD_SMALL(30, Duration.ofMinutes(1)),
         
+        // Bulk Operations - 5 requests per minute per user
+        // Bulk operations RẤT tốn tài nguyên, giảm xuống 5
+        BULK_OPERATION(5, Duration.ofMinutes(1)),
 
-        BULK_OPERATION(10, Duration.ofMinutes(1)),
+        // Download - 50 requests per minute per user
+        // Cân bằng giữa UX và bandwidth protection
+        DOWNLOAD(50, Duration.ofMinutes(1)),
 
-        DOWNLOAD(100, Duration.ofMinutes(1)),
-
+        // List Files - 60 requests per minute per user
+        // Giữ nguyên, cần cho pagination
         LIST_FILES(60, Duration.ofMinutes(1)),
 
-        SEARCH(30, Duration.ofMinutes(1)),
+        // Search - 20 requests per minute per user
+        // Giảm xuống 20 vì search tốn DB resources
+        SEARCH(20, Duration.ofMinutes(1)),
 
-        PUBLIC_ACCESS_IP(50, Duration.ofMinutes(1)),
+        // === PUBLIC ACCESS (Strict) ===
+        // Public Access by IP - 30 requests per minute per IP
+        // Giảm xuống 30 để chặn scraping bots
+        PUBLIC_ACCESS_IP(30, Duration.ofMinutes(1)),
 
-        PUBLIC_ACCESS_TOKEN(200, Duration.ofHours(1));
+        // Public Access by Token - 100 requests per hour per token
+        // Giảm xuống 100/hour (~1.6/min) để chặn abuse
+        PUBLIC_ACCESS_TOKEN(100, Duration.ofHours(1));
 
         private final long capacity;
         private final Duration refillDuration;

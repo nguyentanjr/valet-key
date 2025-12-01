@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-// Nhớ export BACKEND_NODES từ file api.js như hướng dẫn trước
+// Nhớ export BACKEND_NODES từ file api.js
 import { monitoringAPI, BACKEND_NODES } from '../services/api';
 import {
-    FaSync, FaRedo, FaTrash, FaPlug, FaBroom, FaUser, FaGlobe, FaServer, FaCheckCircle, FaTimesCircle
+    FaSync, FaRedo, FaTrash, FaPlug, FaBroom, FaUser, FaGlobe,
+    FaServer, FaCheckCircle, FaTimesCircle,
+    FaDatabase, FaHdd, FaCloud, FaMemory
 } from 'react-icons/fa';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
@@ -12,72 +14,103 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 
 function Monitor({ onBack }) {
     // --- STATE ---
-    // Default chọn node đầu tiên trong danh sách
     const [activeNode, setActiveNode] = useState(BACKEND_NODES[0]);
 
-    const [nodeHealth, setNodeHealth] = useState(null); // Trạng thái UP/DOWN của node
+    const [nodeHealth, setNodeHealth] = useState(null);
     const [circuitBreakers, setCircuitBreakers] = useState([]);
     const [cacheStats, setCacheStats] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [retries, setRetries] = useState({});
 
-
-    // Rate Limit State (Global or Local tùy thiết kế, ở đây giả sử check qua Load Balancer)
+    // Rate Limit State
     const [searchUserId, setSearchUserId] = useState('6');
     const [rateLimitResult, setRateLimitResult] = useState(null);
     const [searchingRateLimit, setSearchingRateLimit] = useState(false);
-    const [searchIp, setSearchIp] = useState('0:0:0:0:0:0:0:1');
 
-    // Load data khi component mount hoặc khi chuyển Tab (activeNode thay đổi)
+    // IP Rate Limit State
+    const [searchIp, setSearchIp] = useState('0:0:0:0:0:0:0:1');
+    const [ipLimitResult, setIpLimitResult] = useState(null);
+    const [searchingIpLimit, setSearchingIpLimit] = useState(false);
+
     useEffect(() => {
         loadMonitoringData();
     }, [activeNode]);
 
-    // Helper
+    // --- HELPERS ---
     const safeMapData = (data) => {
         if (!data || data.message || typeof data !== 'object') return [];
+        // Nếu data là array thì return luôn
+        if (Array.isArray(data)) return data;
         return Object.entries(data).map(([name, info]) => ({ name, ...info }));
     };
 
+    const formatBytes = (bytes, decimals = 2) => {
+        if (!+bytes) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    };
+
+    // --- MAIN LOAD DATA FUNCTION (QUAN TRỌNG NHẤT) ---
     const loadMonitoringData = async () => {
         setRefreshing(true);
-        // Nếu chuyển tab, set loading nhẹ để user biết
         if (!refreshing) setLoading(true);
 
         try {
-            // Gọi API với URL của node đang chọn
             const results = await Promise.allSettled([
-                monitoringAPI.getNodeHealth(activeNode.url),      // Check Health
-                monitoringAPI.getCircuitBreakers(activeNode.url), // Check CB
-                monitoringAPI.getCacheStats(activeNode.url),      // Check Cache
-                monitoringAPI.getRetries(activeNode.url),        // Check Retries 
+                // 1. SỬA QUAN TRỌNG: Gọi getActuatorHealth thay vì getNodeHealth
+                monitoringAPI.getActuatorHealth(activeNode.url),
+
+                // Các API khác giữ nguyên
+                monitoringAPI.getCircuitBreakers(activeNode.url),
+                monitoringAPI.getCacheStats(activeNode.url),
+                monitoringAPI.getRetries(activeNode.url),
             ]);
 
-            // Xử lý Health
+            // --- XỬ LÝ 1: HEALTH (ACTUATOR) ---
             if (results[0].status === 'fulfilled') {
-                setNodeHealth({ status: 'UP', details: results[0].value.data });
+                const res = results[0].value;
+                // Bóc data từ axios response
+                const healthData = res.data ? res.data : res;
+
+                // Nếu đúng chuẩn Actuator, nó sẽ có field 'status' = UP
+                if (healthData.status) {
+                    setNodeHealth({ status: healthData.status, details: healthData });
+                } else {
+                    // Fallback nếu API lạ
+                    setNodeHealth({ status: 'UNKNOWN', details: healthData });
+                }
             } else {
+                console.error("Health Check Error:", results[0].reason);
                 setNodeHealth({ status: 'DOWN', error: results[0].reason?.message });
             }
 
-            // Xử lý Circuit Breaker
+            // --- XỬ LÝ 2: CIRCUIT BREAKERS ---
             if (results[1].status === 'fulfilled') {
-                setCircuitBreakers(safeMapData(results[1].value.data));
+                const res = results[1].value;
+                const data = res.data ? res.data : res;
+                setCircuitBreakers(safeMapData(data));
             } else {
-                setCircuitBreakers([]); // Clear nếu lỗi
+                setCircuitBreakers([]);
             }
 
-            // Xử lý Cache
+            // --- XỬ LÝ 3: CACHE ---
             if (results[2].status === 'fulfilled') {
-                setCacheStats(safeMapData(results[2].value.data));
+                const res = results[2].value;
+                const data = res.data ? res.data : res;
+                setCacheStats(safeMapData(data));
             } else {
                 setCacheStats([]);
             }
 
-            // RETRIES
+            // --- XỬ LÝ 4: RETRIES ---
             if (results[3].status === 'fulfilled') {
-                setRetries(results[3].value.data || {});
+                const res = results[3].value;
+                const data = res.data ? res.data : res;
+                setRetries(data || {});
             } else {
                 setRetries({});
             }
@@ -90,7 +123,7 @@ function Monitor({ onBack }) {
         }
     };
 
-    // --- HANDLERS (Reset, Clear...) ---
+    // --- HANDLERS ---
     const handleResetCircuitBreaker = async (name) => {
         if (!window.confirm(`Reset circuit breaker "${name}" on ${activeNode.name}?`)) return;
         try {
@@ -100,8 +133,7 @@ function Monitor({ onBack }) {
     };
 
     const handleClearCache = async (name) => {
-        // Clear cache trên node hiện tại
-        await monitoringAPI.clearCacheOnAllNodes(name); // Hoặc dùng hàm clear local nếu muốn
+        await monitoringAPI.clearCacheOnAllNodes(name);
         await loadMonitoringData();
     };
 
@@ -114,9 +146,10 @@ function Monitor({ onBack }) {
 
     const handleClearAllRateLimits = async () => {
         if (!window.confirm('Reset ALL rate limits?')) return;
-        await monitoringAPI.clearAllRateLimits(); // Rate limit thường là global (Redis)
+        await monitoringAPI.clearAllRateLimits();
         alert('Rate limits reset!');
         setRateLimitResult(null);
+        setIpLimitResult(null);
     };
 
     const handleSearchRateLimit = async (e) => {
@@ -127,8 +160,26 @@ function Monitor({ onBack }) {
         try {
             const res = await monitoringAPI.getUserRateLimits(searchUserId);
             setRateLimitResult(res.data);
-        } catch (err) { setRateLimitResult({}); }
-        finally { setSearchingRateLimit(false); }
+        } catch (err) {
+            setRateLimitResult({});
+        } finally {
+            setSearchingRateLimit(false);
+        }
+    };
+
+    const handleSearchIpLimit = async (e) => {
+        if (e) e.preventDefault();
+        if (!searchIp) return;
+        setSearchingIpLimit(true);
+        setIpLimitResult(null);
+        try {
+            const res = await monitoringAPI.getIpRateLimits(activeNode.url, searchIp);
+            setIpLimitResult(res.data);
+        } catch (err) {
+            setIpLimitResult({});
+        } finally {
+            setSearchingIpLimit(false);
+        }
     };
 
     // --- CHART DATA ---
@@ -154,10 +205,8 @@ function Monitor({ onBack }) {
     const renderCircuitBreakerCard = (cb) => {
         let stateClass = 'cb-closed';
         let badgeClass = 'bg-success';
-
         if (cb.state === 'OPEN') { stateClass = 'cb-open'; badgeClass = 'bg-danger'; }
         else if (cb.state === 'HALF_OPEN') { stateClass = 'cb-half'; badgeClass = 'bg-warning'; }
-
         const failRate = cb.failureRate !== -1 ? cb.failureRate?.toFixed(1) + '%' : 'Calculating...';
 
         return (
@@ -165,11 +214,10 @@ function Monitor({ onBack }) {
                 <div className={`card ${stateClass}`}>
                     <div className="card-body">
                         <div className="d-flex justify-between align-center mb-3">
-                            <h5 style={{ margin: 0, fontSize: '1rem' }} title={cb.name}>{cb.name}</h5>
+                            <h1 style={{ margin: 0, fontSize: '20px', padding: 0 }} title={cb.name}>{cb.name} (Circuit breakers)</h1>
                             <span className={`badge ${badgeClass}`}>{cb.state}</span>
                         </div>
                         <div style={{ borderBottom: '1px solid #eee', margin: '10px 0' }}></div>
-
                         <div className="d-flex justify-between text-center mb-3">
                             <div style={{ flex: 1 }} className="border-end">
                                 <small className="text-muted">Failed</small>
@@ -180,12 +228,10 @@ function Monitor({ onBack }) {
                                 <div className="text-success fw-bold" style={{ fontSize: '1.2rem' }}>{cb.numberOfSuccessfulCalls}</div>
                             </div>
                         </div>
-
                         <div className="d-flex justify-between align-center bg-light p-2 rounded">
                             <small>Failure Rate:</small>
                             <span className="fw-bold text-danger">{failRate}</span>
                         </div>
-
                         {cb.state === 'OPEN' && (
                             <button className="btn btn-outline-danger w-100 mt-2 btn-sm" onClick={() => handleResetCircuitBreaker(cb.name)}>
                                 <FaRedo /> Force Reset
@@ -202,7 +248,6 @@ function Monitor({ onBack }) {
         const capacity = info.capacity ?? 10;
         const percent = (tokens / capacity) * 100;
         let colorClass = tokens === 0 ? 'bg-danger' : (percent < 30 ? 'bg-warning' : 'bg-success');
-
         return (
             <div className="mb-3" key={limitType}>
                 <div className="d-flex justify-between mb-1">
@@ -221,14 +266,12 @@ function Monitor({ onBack }) {
             <div className="col-span-6" key={name}>
                 <div className="card cb-closed">
                     <div className="card-body">
-
-                        <div className="d-flex justify-between align-center mb-3">
-                            <h5 style={{ margin: 0, fontSize: "1rem" }}>{name}</h5>
-                            <span className="badge bg-primary">Retries</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <h5 style={{ margin: 0, fontSize: "20px" }}>{name} (Retries)</h5>
+                            </div>
                         </div>
-
                         <div style={{ borderBottom: "1px solid #eee", margin: "10px 0" }} />
-
                         <div className="d-flex justify-between text-center mb-3">
                             <div style={{ flex: 1 }} className="border-end">
                                 <small className="text-muted">Success (no retry)</small>
@@ -236,34 +279,29 @@ function Monitor({ onBack }) {
                                     {info.numberOfSuccessfulCallsWithoutRetryAttempt}
                                 </div>
                             </div>
-
                             <div style={{ flex: 1 }} className="border-end">
-                                <small className="text-muted">Success (with retry)</small>
+                                <small className="text-muted">Success (w/ retry)</small>
                                 <div className="fw-bold text-primary" style={{ fontSize: "1.2rem" }}>
                                     {info.numberOfSuccessfulCallsWithRetryAttempt}
                                 </div>
                             </div>
-
                             <div style={{ flex: 1 }}>
-                                <small className="text-muted">Failed (with retry)</small>
+                                <small className="text-muted">Failed (w/ retry)</small>
                                 <div className="fw-bold text-danger" style={{ fontSize: "1.2rem" }}>
                                     {info.numberOfFailedCallsWithRetryAttempt}
                                 </div>
                             </div>
                         </div>
-
                     </div>
                 </div>
             </div>
         );
     };
 
-
-
     return (
         <div className="monitor-full-page">
             <div className="monitor-wrapper">
-                {/* HEADER & GLOBAL ACTIONS */}
+                {/* HEADER */}
                 <div className="monitor-header">
                     <div>
                         <h2 style={{ margin: 0, color: '#444' }}>System Monitor</h2>
@@ -281,14 +319,11 @@ function Monitor({ onBack }) {
                         <button style={{ background: '#6c63ff', color: 'white', border: 'none' }} className="btn btn-outline-warning me-2" onClick={handleClearAllRateLimits}>
                             <FaBroom /> Global Limits Reset
                         </button>
-                        <button style={{ background: '#6c63ff', color: 'white', border: 'none' }} className="btn btn-outline-danger" onClick={handleClearAllCaches}>
-                            <FaTrash /> Global Cache Clear
-                        </button>
                     </div>
                 </div>
 
                 <div className="monitor-content-area">
-                    {/* === TABS FOR 3 BACKENDS === */}
+                    {/* TABS */}
                     <div className="monitor-tabs">
                         {BACKEND_NODES.map((node) => (
                             <button
@@ -307,7 +342,7 @@ function Monitor({ onBack }) {
                         ))}
                     </div>
 
-                    {/* NODE SPECIFIC CONTENT */}
+                    {/* CONTENT */}
                     <div className="tab-content">
                         {loading ? (
                             <div className="monitor-loading">
@@ -323,14 +358,117 @@ function Monitor({ onBack }) {
                             </div>
                         ) : (
                             <>
+                                {/* 1. INFRASTRUCTURE HEALTH */}
                                 <h4 className="monitor-section-title">
-                                    <FaPlug /> Circuit Breakers & Retries
-                                    <span className="text-muted small">({activeNode.name})</span>
+                                    <FaServer /> Infrastructure Health
+                                    <span className="text-muted small"> ({activeNode.name})</span>
                                 </h4>
 
-                                <div className="dashboard-grid">
+                                <div className="dashboard-grid mb-4">
+                                    {(() => {
+                                        const components = nodeHealth?.details?.components || {};
+                                        const db = components.db;
+                                        const redis = components.redis;
+                                        const disk = components.diskSpace;
+                                        const azure = components.circuitBreakers?.details?.azureService;
 
-                                    {/* Circuit Breakers */}
+                                        return (
+                                            <>
+                                                <div className="col-span-4">
+                                                    <div className={`monitor-card ${db?.status === 'UP' ? 'border-success-subtle' : 'border-danger-subtle'}`}>
+                                                        <div className="d-flex align-center justify-between mb-3">
+                                                            <div className="d-flex align-center gap-2">
+                                                                <FaDatabase className="text-secondary" style={{ fontSize: '1.5rem', marginRight: '0.5rem' }} />
+                                                                <span className="fw-bold">Database</span>
+                                                                <span style={{ marginLeft: '10px' }} className={`badge ${db?.status === 'UP' ? 'bg-success' : 'bg-danger'}`}>
+                                                                    {db?.status || 'UNKNOWN'}
+                                                                </span>
+                                                            </div>
+
+                                                        </div>
+                                                        <div className="small text-muted">
+                                                            Type: <strong>{db?.details?.database || 'N/A'}</strong>
+                                                            <span style={{ marginLeft: '1rem' }} className="small text-muted">
+                                                                Query: {db?.details?.result === 1 ? <span className="text-success">Pass</span> : 'Fail'}
+                                                            </span>
+                                                        </div>
+
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-span-4">
+                                                    <div className={`monitor-card ${redis?.status === 'UP' ? 'border-success-subtle' : 'border-danger-subtle'}`}>
+                                                        <div className="d-flex align-center justify-between mb-3">
+                                                            <div className="d-flex align-center gap-2">
+                                                                <FaMemory className="text-danger" style={{ fontSize: '1.5rem', marginRight: '0.5rem', transform: 'translateY(4px)' }} />
+                                                                <span className="fw-bold">Redis</span>
+                                                                <span style={{ marginLeft: '10px' }} className={`badge ${redis?.status === 'UP' ? 'bg-success' : 'bg-danger'}`}>
+                                                                    {redis?.status || 'UNKNOWN'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="small text-muted">
+                                                            Version: <strong>{redis?.details?.version || 'N/A'}</strong>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-span-4">
+                                                    <div className={`monitor-card ${azure?.status === 'UP' ? 'border-success-subtle' : 'border-danger-subtle'}`}>
+                                                        <div className="d-flex align-center justify-between mb-3">
+                                                            <div className="d-flex align-center gap-2">
+                                                                <FaCloud className="text-primary" style={{ fontSize: '1.5rem', marginRight: '0.5rem', transform: 'translateY(4px)' }} />
+                                                                <span className="fw-bold">Azure Blob</span>
+                                                                <span style={{ marginLeft: '10px' }} className={`badge ${azure?.status === 'UP' ? 'bg-success' : 'bg-danger'}`}>
+                                                                    {azure?.status || 'UNKNOWN'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="small text-muted d-flex justify-between">
+                                                            <span>Circuit breaker: </span>
+                                                            <span className={`fw-bold ${azure?.details?.state === 'CLOSED' ? 'text-success' : 'text-danger'}`}>
+                                                                {azure?.details?.state || 'N/A'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-span-4">
+                                                    <div className="monitor-card">
+                                                        <div className="d-flex align-center justify-between mb-3">
+                                                            <div className="d-flex align-center gap-2">
+                                                                <FaHdd className="text-secondary" style={{ fontSize: '1.5rem', marginRight: '0.5rem', transform: 'translateY(3px)' }} />
+                                                                <span className="fw-bold">Disk Space</span>
+                                                            </div>
+
+                                                        </div>
+                                                        {disk?.details ? (
+                                                            <div>
+                                                                <div className="d-flex justify-between small text-muted mb-1">
+                                                                    <span>Free: {formatBytes(disk.details.free)}</span>
+                                                                    <span style={{ marginLeft: '10px' }}>Total: {formatBytes(disk.details.total)}</span>
+                                                                </div>
+                                                                <div className="progress" style={{ height: '6px' }}>
+                                                                    <div
+                                                                        className="progress-bar bg-info"
+                                                                        style={{ width: `${((disk.details.total - disk.details.free) / disk.details.total * 100)}%` }}
+                                                                    ></div>
+                                                                </div>
+                                                            </div>
+                                                        ) : <small className="text-muted">No info</small>}
+                                                    </div>
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+
+                                {/* 2. CIRCUIT BREAKERS */}
+                                <h4 className="monitor-section-title">
+                                    <FaPlug /> Circuit Breakers & Retries
+                                    <span className="text-muted small"> ({activeNode.name})</span>
+                                </h4>
+                                <div className="dashboard-grid">
                                     {circuitBreakers.length > 0 ? (
                                         circuitBreakers.map(renderCircuitBreakerCard)
                                     ) : (
@@ -338,8 +476,6 @@ function Monitor({ onBack }) {
                                             <div className="alert alert-info">No Circuit Breakers active on this node.</div>
                                         </div>
                                     )}
-
-                                    {/* Retries */}
                                     {retries && Object.keys(retries).length > 0 ? (
                                         Object.entries(retries).map(([name, info]) =>
                                             renderRetriesCard(name, info)
@@ -352,74 +488,14 @@ function Monitor({ onBack }) {
                                 </div>
 
 
-
-                                {/* 2. CACHE STATISTICS */}
-                                <h4 className="monitor-section-title">
-                                    <FaSync /> Cache Statistics <span className="text-muted small">({activeNode.name})</span>
-                                </h4>
-                                <div className="dashboard-grid">
-                                    {/* Table */}
-                                    <div className="col-span-8">
-                                        <div className="monitor-card">
-                                            <div className="monitor-table-container">
-                                                <table className="monitor-table">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>Name</th>
-                                                            <th>Hit Rate</th>
-                                                            <th>Items</th>
-                                                            <th>Action</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {cacheStats.map(cache => {
-                                                            const hitRate = cache.hitRate ? (cache.hitRate * 100).toFixed(1) : 0;
-                                                            return (
-                                                                <tr key={cache.name}>
-                                                                    <td><strong>{cache.name}</strong></td>
-                                                                    <td style={{ width: '40%' }}>
-                                                                        <div className="cache-hitrate-display">
-                                                                            <span className="hitrate-percent">{hitRate}%</span>
-                                                                            <div className="progress-bar-wrapper">
-                                                                                <div className={`progress-bar-fill ${hitRate < 50 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${hitRate}%` }}></div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </td>
-                                                                    <td>{cache.estimatedSize || 0}</td>
-                                                                    <td><button className="btn-link-danger" onClick={() => handleClearCache(cache.name)}>Clear</button></td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                        {cacheStats.length === 0 && <tr><td colSpan="4" className="text-center text-muted">No caches found.</td></tr>}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Chart */}
-                                    <div className="col-span-4">
-                                        <div className="monitor-card monitor-chart-card">
-                                            <div style={{ width: '100%', maxWidth: '250px', margin: '0 auto' }}>
-                                                <Doughnut data={cacheChartData} options={{
-                                                    responsive: true,
-                                                    maintainAspectRatio: false,
-                                                    cutout: '70%',
-                                                    plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Cache Efficiency' } }
-                                                }} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                             </>
                         )}
                     </div>
 
-                    {/* 3. GLOBAL TOOLS (RATE LIMITS) */}
+                    {/* 4. GLOBAL TOOLS */}
                     <div className="monitor-global-section">
                         <h4 className="monitor-section-title"><FaGlobe /> Global Rate Limit Inspector</h4>
                         <div className="dashboard-grid">
-                            {/* User Check */}
                             <div className="col-span-6">
                                 <div className="monitor-card">
                                     <div className="monitor-card-title">
@@ -441,13 +517,12 @@ function Monitor({ onBack }) {
                                     <div className="rate-limit-results">
                                         {rateLimitResult && Object.keys(rateLimitResult).length > 0 ?
                                             Object.entries(rateLimitResult).map(([key, val]) => renderRateLimitBar(key, val)) :
-                                            <small className="text-muted">Enter User ID to check limits...</small>
+                                            (rateLimitResult ? <div className="alert alert-secondary py-1">No active limits found for this User.</div> :
+                                                <small className="text-muted">Enter User ID to check limits...</small>)
                                         }
                                     </div>
                                 </div>
                             </div>
-
-                            {/* IP Check */}
                             <div className="col-span-6">
                                 <div className="monitor-card">
                                     <div className="monitor-card-title">
@@ -460,10 +535,19 @@ function Monitor({ onBack }) {
                                             placeholder="IP Address"
                                             value={searchIp}
                                             onChange={(e) => setSearchIp(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleSearchIpLimit()}
                                         />
-                                        <button className="monitor-btn">Check</button>
+                                        <button className="monitor-btn" onClick={handleSearchIpLimit} disabled={searchingIpLimit}>
+                                            {searchingIpLimit ? '...' : 'Check'}
+                                        </button>
                                     </div>
-                                    <small className="text-muted">Check limits for anonymous users.</small>
+                                    <div className="rate-limit-results">
+                                        {ipLimitResult && Object.keys(ipLimitResult).length > 0 ?
+                                            Object.entries(ipLimitResult).map(([key, val]) => renderRateLimitBar(key, val)) :
+                                            (ipLimitResult ? <div className="alert alert-secondary py-1">No active limits found for this IP.</div> :
+                                                <small className="text-muted">Enter IP to check limits (e.g., 127.0.0.1)</small>)
+                                        }
+                                    </div>
                                 </div>
                             </div>
                         </div>

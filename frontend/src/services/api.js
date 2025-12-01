@@ -267,6 +267,9 @@ const requestNode = (nodeUrl, method, endpoint, data = null, params = {}) => {
 };
 
 export const monitoringAPI = {
+
+  getActuatorHealth: (nodeUrl) =>
+    requestNode(nodeUrl, 'GET', '/actuator/health'),
   // 1. HEALTH
   // Lấy health của 1 node cụ thể (dùng cho hàm loadMonitoringData bên Monitor.js)
   getNodeHealth: (nodeUrl) =>
@@ -306,6 +309,9 @@ export const monitoringAPI = {
   // Nhưng để chắc chắn, ta cứ gọi api mặc định (qua Load Balancer)
   getUserRateLimits: (userId) =>
     api.get(`/api/admin/monitoring/rate-limits/user/${userId}`),
+
+  getIpRateLimits: (nodeUrl, ip) =>
+    requestNode(nodeUrl, 'GET', '/api/admin/monitoring/rate-limits/ip', null, { ip }),
 
   clearAllRateLimits: () =>
     api.post('/api/admin/monitoring/rate-limits/clear-all'),
